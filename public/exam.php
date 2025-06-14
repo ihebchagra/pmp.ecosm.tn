@@ -110,7 +110,7 @@ $share_token_input = $attempt['is_guest'] && $share_token
     <h2>Énoncé : </h2>
     <?php if ($image_url): ?>
         <div class="project-image" style="text-align:center; margin-bottom:1em;">
-            <img src="<?php echo $image_url; ?>" alt="Image du projet" style="max-width:36rem; border-radius:8px;">
+            <img src="<?php echo $image_url; ?>" alt="Image du projet" style="max-width:100%; width: 36rem; border-radius:8px;">
         </div>
     <?php endif; ?>
     <div style="white-space: pre-line;"><?php echo $problem_text; ?></div>
