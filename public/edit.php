@@ -79,10 +79,17 @@ if ($project_id > 0) {
     }
 }
 
-$solution_points_options = ['dead', '-2', '-1', '0', '1', '2'];
+$solution_points_options = [
+    ['value' => '2', 'label' => 'Choix essentiel: +2 points'],
+    ['value' => '1', 'label' => 'Choix utile: +1 point'],
+    ['value' => '0', 'label' => 'Choix indifférent : +0 points'],
+    ['value' => '-1', 'label' => 'Choix non dangereux mais inefficace : -1 point'],
+    ['value' => '-2', 'label' => 'Choix dangereux ou inutilement coûteux : -2 points'],
+    ['value' => 'dead', 'label' => 'Finir l\'épreuve']
+];
 $penalty_options = [
-    ['value' => '', 'label' => 'Pas de pénalité'],
-    ['value' => 'dead', 'label' => 'Mortel (score bloc à 0)'],
+    ['value' => '', 'label' => 'Pas de sanction'],
+    ['value' => 'dead', 'label' => 'Finir l\'épreuve'],
     ['value' => '-2', 'label' => '-2 points'],
     ['value' => '-1', 'label' => '-1 point']
 ];
@@ -96,7 +103,6 @@ $penalty_options = [
     <title><?php echo $project_id > 0 ? 'Modifier' : 'Créer'; ?> un Projet</title>
     <?php require_once __DIR__ . '/../powertrain/head.php'; ?>
     <style>
-        .bloc { border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; border-radius: 8px; background-color: #f9f9f9; }
         .proposition { border: 1px dashed #ddd; padding: 1em; margin-top: 1em; margin-bottom:1em; background-color: #fff; }
         label { font-weight: bold; margin-top: 0.5em; display: block; }
         textarea, input[type="text"], input[type="number"], select { width: 100%; margin-bottom: 0.5em; }
@@ -138,7 +144,6 @@ $penalty_options = [
                         <div style="display: flex; justify-content: space-between; margin-bottom: 1em;">
                             <h4>
                                 Bloc <span x-text="blocIndex + 1"></span>
-                                <small x-show="bloc.bloc_id">(ID DB: <span x-text="bloc.bloc_id"></span>)</small>
                             </h4>
                             <button type="button" class="delete-btn" @click="removeBloc(blocIndex)">Supprimer Bloc</button>
                         </div>
@@ -176,7 +181,6 @@ $penalty_options = [
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5em;">
                                     <h6>
                                         Proposition <span x-text="propIndex + 1"></span>
-                                        <small x-show="prop.proposition_id">(ID DB: <span x-text="prop.proposition_id"></span>)</small>
                                     </h6>
                                     <button type="button" class="delete-btn" @click="removeProposition(blocIndex, propIndex)">Supprimer Proposition</button>
                                 </div>
@@ -188,7 +192,7 @@ $penalty_options = [
                                 <label>Points:</label>
                                 <select :name="`blocs[${blocIndex}][propositions][${propIndex}][solution_points]`" x-model="prop.solution_points" required>
                                     <?php foreach ($solution_points_options as $option): ?>
-                                    <option value="<?php echo $option; ?>"><?php echo $option; ?></option>
+                                    <option value="<?php echo $option['value']; ?>"><?php echo htmlspecialchars($option['label']); ?></option>
                                     <?php endforeach; ?>
                                 </select>
 

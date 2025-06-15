@@ -208,8 +208,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_copy']) && $s
         <?php endif; ?>
 
         <?php if (!$success_message && $source_project): ?>
-        <div class="confirmation-card">
-            <h3><?php echo $is_shared_access_by_token ? 'Copier le projet partagé :' : 'Dupliquer votre projet :'; ?></h3>
             <dl class="project-details">
                 <dt>Nom du projet original :</dt><dd><?php echo htmlspecialchars($source_project['project_name']); ?></dd>
                 <dt>Propriétaire original :</dt><dd><?php echo htmlspecialchars($source_project['user_id']); ?></dd>
@@ -227,7 +225,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_copy']) && $s
                 <button type="submit" class="contrast" style="margin-top:1em;"><?php echo $is_shared_access_by_token ? 'Confirmer la Copie' : 'Dupliquer dans Mon Compte'; ?></button>
                 <a href="<?php echo $is_shared_access_by_token ? '/' : '/dashboard.php'; ?>" role="button" class="secondary" style="margin-top:1em;">Annuler</a>
             </form>
-        </div>
         <?php elseif (!$source_project): ?>
              <p class="alert-error">Le projet source n'a pas pu être chargé.</p>
         <?php endif; ?>

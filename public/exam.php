@@ -8,18 +8,18 @@ $attempt_id = isset($_GET['attempt_id']) ? intval($_GET['attempt_id']) : 0;
 $share_token_from_url = $_GET['share_token'] ?? null;
 
 // --- 1. Fetch Attempt ---
-if (!$attempt_id) { 
+if (!$attempt_id) {
     // No attempt_id, check if this is a shared exam access
     if ($share_token_from_url) {
         // Validate share token is for exam
         $stmt_share = $db->prepare('SELECT * FROM project_shares WHERE share_token = :token AND share_type = \'exam\'');
         $stmt_share->execute(['token' => $share_token_from_url]);
         $share = $stmt_share->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$share) {
             die("Token de partage invalide ou ne permettant pas l'accès à l'examen.");
         }
-        
+
         // This is a valid shared exam access, redirect to start-exam.php
         header('Location: /start-exam.php?share_token=' . urlencode($share_token_from_url));
         exit;
@@ -56,7 +56,7 @@ if ($attempt['is_guest']) {
 
 // --- 4. Check if Attempt is Locked ---
 if ($attempt['locked']) {
-    header('Location: /attempt-result.php?attempt_id=' . $attempt_id . 
+    header('Location: /attempt-result.php?attempt_id=' . $attempt_id .
           ($share_token_from_url ? '&share_token=' . urlencode($share_token_from_url) : ''));
     exit;
 }
@@ -90,10 +90,10 @@ $exam_structure_json = htmlspecialchars(json_encode($exam_structure), ENT_QUOTES
 $share_token_html = htmlspecialchars($share_token_from_url, ENT_QUOTES, 'UTF-8');
 
 $points_labels_array = [
-    '2' => 'Proposition obligatoire : +2 points', '1' => 'Proposition utile : +1 point',
-    '0' => 'Proposition inutile : +0 points', '-1' => 'Proposition dangereuse : -1 point',
-    '-2' => 'Proposition dangereuse : -2 points',
-    'dead' => "Proposition dangereuse, score du bloc mis à 0."
+    '2' => 'Choix essentiel: +2 points', '1' => 'Choix utile: +1 point',
+    '0' => 'Choix indifférent : +0 points', '-1' => 'Choix non dangereux mais inefficace : -1 point',
+    '-2' => 'Choix dangereux ou inutilement coûteux : -2 points',
+    'dead' => "Choix mettant en danger le pronostic vital: votre score est mis à 0 points, bloc/épreuve fini"
 ];
 $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QUOTES, 'UTF-8');
 ?>
@@ -121,13 +121,12 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
         .solution-text { margin-top: 0.5em; padding: 0.5em; background-color: #fff; border: 1px dashed #ddd; font-size:0.9em;}
         .penalty-info { color: #c57500; font-size: 0.85em; margin-top: 0.3em;}
         .penalty-info.dead { color: #dc3545; font-weight: bold; }
-        .bloc-images img { max-width: 200px; max-height:150px; margin: 5px; border: 1px solid #ddd; border-radius:4px;}
+        .bloc-images img { max-width: 36rem; max-height:auto; width: 100%;  display: block; margin: 0 auto; align-self: center; border: 1px solid #ddd; border-radius:4px;}
         [x-cloak] { display: none !important; }
         .timer { font-weight: bold; color: var(--pico-primary); }
         .modal-is-open dialog[open] { display: flex; }
         dialog[open] { animation: fade-in 0.3s; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .navigation-section { margin-top:1.5em; padding:1em; background-color:#e9ecef; border-radius:4px; }
         .saving-overlay {
             position: fixed;
             top: 0;
@@ -151,21 +150,32 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
 <body x-data="examController(<?php echo $exam_structure_json; ?>, <?php echo $attempt_id_html; ?>, <?php echo $points_labels_json; ?>)" x-cloak>
 <main class="container">
     <header>
-        <h1>Examen: <?php echo $project_name_html; ?></h1>
+        <h1>Tentative PMP : <?php echo $project_name_html; ?></h1>
         <p>Étudiant: <?php echo $student_name_html; ?></p>
-        <p>ID de Tentative: <?php echo $attempt_id_html; ?>
-            <span x-show="examFlow.examStarted && !examFlow.examFinished && currentBloc()" style="margin-left:2em;">
-                Bloc Actuel: <span x-text="examFlow.currentBlocIndex + 1"></span> / <?php echo count($exam_structure); ?>
-            </span>
+        <!--<p>ID de Tentative: <?php echo $attempt_id_html; ?>-->
+        <span x-show="examFlow.examStarted && !examFlow.examFinished && currentBloc()">
+            Bloc Actuel: <span x-text="examFlow.currentBlocIndex + 1"></span> / <?php echo count($exam_structure); ?>
+        </span>
         </p>
-        <p>Stage: <?php echo htmlspecialchars($attempt['stage']); ?>, Niveau: <?php echo htmlspecialchars($attempt['niveau']); ?>, Centre: <?php echo htmlspecialchars($attempt['centre_exam']); ?></p>
+        <p>Stage: <?php echo htmlspecialchars($attempt['stage']); ?>, Niveau: <?php echo htmlspecialchars($attempt['niveau']); ?>, Centre d'examen: <?php echo htmlspecialchars($attempt['centre_exam']); ?></p>
     </header>
     <hr>
 
     <section x-show="!examFlow.examStarted" id="instructionsSection">
         <h2>Instructions</h2>
-        <p>Bienvenue à votre PMP. Lisez attentivement chaque situation et choisissez les propositions qui vous semblent appropriées.</p>
-        <p>Cliquez sur "Commencer l'Épreuve" pour démarrer.</p>
+        <p>Bienvenue dans votre PMP. Veuillez lire attentivement les instructions avant de commencer.</p>
+        <p>Un cas clinique vous sera présenté, accompagné de plusieurs propositions.</p>
+        <p>Faites vos choix parmi les options suivantes, en les sélectionnant <b>dans l'ordre qui vous semble le plus approprié</b>.</p>
+        <p>L'échelle de cotation est la suivante :</p>
+        <ul>
+            <li>(-2) choix dangereux ou inutilement coûteux</li>
+            <li>(-1) choix non dangereux mais inefficace</li>
+            <li>(0) choix neutre</li>
+            <li>(+1) choix utile</li>
+            <li>(+2) choix essentiel</li>
+        </ul>
+        <p><b>Tout choix mettant en danger le pronostic vital de la patiente entraînera l'arrêt immédiat de l'épreuve.</b></p>
+        <p>Cliquez sur "Commencer l'Épreuve" pour démarrer l'épreuve.</p>
         <div class="centered" style="margin-top:2em; margin-bottom:2em;">
             <button @click="startExam()" class="contrast">Commencer l'Épreuve</button>
         </div>
@@ -173,35 +183,35 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
 
     <section x-show="examFlow.examStarted && !examFlow.examFinished" id="examContentSection">
         <template x-if="currentBloc()">
-            <article class="bloc-item" :key="currentBloc().bloc_id">
+            <div :key="currentBloc().bloc_id">
                 <h3>Bloc <span x-text="examFlow.currentBlocIndex + 1"></span></h3>
-                <p x-show="currentBlocState() && currentBlocState().timeLeft !== null">
-                    Temps Restant pour ce Bloc:
-                    <span class="timer" x-text="currentBlocState() ? formatTime(currentBlocState().timeLeft) : 'N/A'"></span>
-                </p>
-                <p x-show="currentBlocState()">
-                    Score pour ce bloc:
-                    <strong x-text="currentBlocState() ? currentBlocState().score : 0"></strong>
-                </p>
+
 
                 <div x-show="currentBloc().images && currentBloc().images.length > 0" class="bloc-images">
                      <template x-for="image in currentBloc().images" :key="image.image_path">
                         <img :src="'/' + image.image_path" :alt="'Image du bloc ' + (examFlow.currentBlocIndex + 1)">
                     </template>
                 </div>
-
-                <h4>Énoncé du Bloc:</h4>
+                <h4 style="margin-top: 1rem">Énoncé :</h4>
                 <div class="problem-text" x-html="currentBloc().problem_text ? currentBloc().problem_text.replace(/\n/g, '<br>') : ''"></div>
+                <p x-show="currentBlocState() && currentBlocState().timeLeft !== null">
+                    <b>Temps Restant pour ce Bloc</b>:
+                    <span class="timer" x-text="currentBlocState() ? formatTime(currentBlocState().timeLeft) : 'N/A'"></span>
+                </p>
+                <!--<p x-show="currentBlocState()">
+                    Score actuel:
+                    <strong x-text="currentBlocState() ? currentBlocState().score : 0"></strong>
+                </p>-->
 
                 <div x-show="currentBloc().propositions && currentBloc().propositions.length > 0">
-                    <h5>Propositions (ordre aléatoire):</h5>
+                    <h5>Propositions :</h5>
                     <div class="propositions-list">
                         <template x-for="proposition in currentBloc().propositions" :key="proposition.proposition_id">
                             <div class="proposition-item"
                                  @click="!isPropositionDisabled(proposition.proposition_id) && selectProposition(proposition)"
                                  :class="{
                                      'chosen': isPropositionChosen(proposition.proposition_id),
-                                     'dead-chosen': isPropositionChosen(proposition.proposition_id) && (proposition.solution_points === 'dead' || getPenaltyTypeForProposition(proposition.proposition_id) === 'dead'),
+                                     'dead-chosen': isPropositionChosen(proposition.proposition_id) && (proposition.solution_points < 0 || proposition.solution_points === 'dead' || getPenaltyTypeForProposition(proposition.proposition_id) === 'dead'),
                                      'disabled': isPropositionDisabled(proposition.proposition_id)
                                  }">
                                 <p><strong x-text="proposition.proposition_text"></strong></p>
@@ -210,10 +220,10 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                                     <p x-html="proposition.solution_text ? proposition.solution_text.replace(/\n/g, '<br>') : ''"></p>
                                     <template x-if="getAppliedPenaltyForProposition(proposition.proposition_id)">
                                         <p :class="{'penalty-info': true, 'dead': getPenaltyTypeForProposition(proposition.proposition_id) === 'dead'}">
-                                            <strong>Pénalité appliquée:</strong> 
-                                            <span x-text="getPenaltyTypeForProposition(proposition.proposition_id) === 'dead' ? 
-                                                'Mortelle (score du bloc mis à 0)' : 
-                                                getAppliedPenaltyForProposition(proposition.proposition_id) + ' points'"></span> 
+                                            <strong>Sanction appliquée:</strong>
+                                            <span x-text="getPenaltyTypeForProposition(proposition.proposition_id) === 'dead' ?
+                                                'Mortelle (score du bloc mis à 0)' :
+                                                getAppliedPenaltyForProposition(proposition.proposition_id) + ' points'"></span>
                                             pour choix prématuré.
                                         </p>
                                     </template>
@@ -226,14 +236,12 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                 <div class="navigation-section" x-show="examFlow.examStarted && !examFlow.examFinished && currentBloc()">
                     <div x-show="currentBlocState() && currentBlocState().isEnded">
                         <h4>Ce bloc est terminé.</h4>
-                        <p>Votre score final pour ce bloc: <strong x-text="currentBlocState() ? currentBlocState().score : 0"></strong>.</p>
                     </div>
-                     <button @click="moveToNextBlocOrFinish()" class="primary" :disabled="!currentBlocState()">
+                     <button style="width: 100%" @click="moveToNextBlocOrFinish()" class="primary" :disabled="!currentBlocState()">
                         <span x-text="examFlow.currentBlocIndex < examStructure.length - 1 ? 'Passer au Bloc Suivant' : 'Terminer l\'Examen'"></span>
                     </button>
-                    <p x-show="currentBlocState() && !currentBlocState().isEnded" style="margin-top:0.5em;"><small>Vous pouvez passer au bloc suivant ou terminer l'examen même si le temps n'est pas écoulé ou toutes les propositions ne sont pas choisies. Le score actuel du bloc sera enregistré.</small></p>
                 </div>
-            </article>
+            </div>
         </template>
     </section>
 
@@ -318,8 +326,8 @@ const modal = new Modal();
 
 function examController(examData, attemptId, pointsLabels) {
     return {
-        examStructure: examData, 
-        attemptId: attemptId, 
+        examStructure: examData,
+        attemptId: attemptId,
         pointsLabels: pointsLabels,
         activeTimers: {},
         isSaving: false,
@@ -446,6 +454,7 @@ function examController(examData, attemptId, pointsLabels) {
                     proposition.penalty_value_if_chosen_early !== null) {
 
                     const requiredPrecedentId = proposition.precedent_proposition_for_penalty_id;
+                    console.log(requiredPrecedentId);
                     if (!state.chosenPropositionIds.includes(requiredPrecedentId)) {
                         // Precedent NOT chosen yet, apply penalty
                         if (proposition.penalty_value_if_chosen_early === 'dead') {
@@ -528,7 +537,7 @@ function examController(examData, attemptId, pointsLabels) {
                 cbState.isEnded = true;
             }
             this.stopBlocTimer();
-            
+
             // Check if this is the last bloc
             if (this.examFlow.currentBlocIndex < this.examStructure.length - 1) {
                 this.examFlow.currentBlocIndex++;

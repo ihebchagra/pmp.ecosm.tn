@@ -108,6 +108,7 @@ $answers_data = $stmt_answers_for_attempt->fetchAll(PDO::FETCH_ASSOC);
 
 $answers_by_bloc_id = [];
 $bloc_raw_scores_map = [];
+$bloc_is_dead = [];
 
 foreach ($answers_data as $answer_item) {
     $bloc_id_for_answer = $answer_item['bloc_id'];
@@ -135,6 +136,9 @@ foreach ($answers_data as $answer_item) {
         }
     }
     $bloc_raw_scores_map[$bloc_id_for_answer] = $current_bloc_has_dead ? 0 : $current_bloc_temp_score;
+    if ($current_bloc_has_dead) {
+        $bloc_is_dead[$bloc_id_for_answer] = true;
+    }
 }
 
 
@@ -146,7 +150,9 @@ foreach ($blocs_for_project as $bloc_item) {
     $min_s = 0; $max_s = 0;
     if (isset($propositions_by_bloc_id[$bloc_id_current])) {
         foreach ($propositions_by_bloc_id[$bloc_id_current] as $prop_for_minmax) {
-            if ($prop_for_minmax['solution_points'] === 'dead') continue; // Dead props don't count for min/max range
+            if ($prop_for_minmax['solution_points'] === 'dead') {
+                continue; // Skip "dead" propositions in min/max calculation
+            }
             $pts = (int)$prop_for_minmax['solution_points'];
             if ($pts < 0) $min_s += $pts;
             else if ($pts > 0) $max_s += $pts;
@@ -156,8 +162,11 @@ foreach ($blocs_for_project as $bloc_item) {
     $bloc_min_max_scores[$bloc_id_current] = ['min' => $min_s, 'max' => $max_s, 'range' => $current_range];
     
     $raw_s = $bloc_raw_scores_map[$bloc_id_current] ?? 0;
-    
-    if ($current_range > 0) {
+    if (!isset($answers_by_bloc_id[$bloc_id_current])) {
+         $norm_s = 0;
+    }else if ($bloc_is_dead[$bloc_id_current] == true) {
+         $norm_s = 0;
+    } else if ($current_range > 0) {
         $norm_s = round((($raw_s + abs($min_s)) / $current_range) * 20, 2);
     } else { 
         // If range is 0 (e.g., all propositions have 0 points, no negatives)
@@ -240,8 +249,7 @@ $project_name_html = htmlspecialchars($project['project_name']);
     <?php if (!$is_guest_with_valid_token_for_results && $current_user_email): // Show navbar only for logged-in owners ?>
     <nav id="navbar">
         <ul>
-            <li><a href="/dashboard.php">Tableau de Bord</a></li>
-            <li><a href="/results.php?project_id=<?php echo $project['project_id']; ?>">Tous les résultats de "<?php echo $project_name_html; ?>"</a></li>
+            <li><a href="/dashboard.php">Retour à l'Accueil</a></li>
         </ul>
     </nav>
     <?php endif; ?>
@@ -249,9 +257,9 @@ $project_name_html = htmlspecialchars($project['project_name']);
     <main class="container">
         <header style="text-align: center;">
             <h1>Résultats d'Examen</h1>
-            <p><strong>Projet:</strong> <?php echo $project_name_html; ?></p>
-            <p><strong>Étudiant:</strong> <?php echo $student_name_html; ?></p>
-            <p><strong>Date:</strong> <?php echo date('d/m/Y H:i', strtotime($attempt['created_at'])); ?></p>
+            <p><strong>PMP :</strong> <?php echo $project_name_html; ?></p>
+            <p><strong>Étudiant :</strong> <?php echo $student_name_html; ?></p>
+            <p><strong>Date :</strong> <?php echo date('d/m/Y H:i', strtotime($attempt['created_at'])); ?></p>
             <?php if ($attempt['stage'] || $attempt['niveau'] || $attempt['centre_exam']): ?>
                 <p>
                     <?php if ($attempt['stage']): ?><strong>Stage:</strong> <?php echo htmlspecialchars($attempt['stage']); ?> <?php endif; ?>
@@ -291,10 +299,7 @@ $project_name_html = htmlspecialchars($project['project_name']);
             </h3>
             <div class="score-details">
                 <div class="score-row"><span class="score-label">Score brut obtenu:</span> <span><?php echo $raw_s_disp; ?> points</span></div>
-                <div class="score-row"><span class="score-label">Score minimum possible (hors mortel):</span> <span><?php echo $min_s_disp; ?> points</span></div>
-                <div class="score-row"><span class="score-label">Score maximum possible (hors mortel):</span> <span><?php echo $max_s_disp; ?> points</span></div>
-                <div class="score-row"><span class="score-label">Échelle de conversion (Max + |Min|):</span> <span><?php echo $bloc_min_max_scores[$bloc_id_disp]['range']; ?></span></div>
-                <div class="score-row final-score"><span>Score normalisé pour ce bloc:</span> <span><?php echo $norm_s_disp; ?>/20</span></div>
+                <div class="score-row final-score"><span>Score pour ce bloc:</span> <span><?php echo $norm_s_disp; ?>/20</span></div>
             </div>
             <div class="bloc-text" style="margin-top:1em; white-space: pre-line;"><?php echo htmlspecialchars($bloc_display_item['problem_text']); ?></div>
             
@@ -306,16 +311,16 @@ $project_name_html = htmlspecialchars($project['project_name']);
             </div>
             <?php endif; ?>
             
-            <h4>Propositions choisies par l'étudiant:</h4>
+            <h4>Propositions choisies :</h4>
             <?php if (!empty($answers_by_bloc_id[$bloc_id_disp])):
                 foreach ($answers_by_bloc_id[$bloc_id_disp] as $answer_display_item):
                     $is_dead_disp = ($answer_display_item['solution_points'] === 'dead' || $answer_display_item['penalty_applied'] === 'dead');
             ?>
-            <div class="chosen-proposition <?php echo $is_dead_disp ? 'dead' : ''; ?>">
+            <div class="chosen-proposition <?php echo ($is_dead_disp || ($answer_display_item['solution_points'] < 0)) ? 'dead' : ''; ?>">
                 <p><strong><?php echo htmlspecialchars($answer_display_item['proposition_text']); ?></strong></p>
                 <div class="solution-text">
                     <p>
-                        <?php if ($answer_display_item['solution_points'] === 'dead'): ?> <span class="points-badge points-dead">Mortel</span>
+                        <?php if ($answer_display_item['solution_points'] === 'dead'): ?> <span class="points-badge points-dead">Finir épreuve</span>
                         <?php elseif ((int)$answer_display_item['solution_points'] > 0): ?> <span class="points-badge points-positive"><?php echo $answer_display_item['solution_points']; ?> points</span>
                         <?php elseif ((int)$answer_display_item['solution_points'] < 0): ?> <span class="points-badge points-negative"><?php echo $answer_display_item['solution_points']; ?> points</span>
                         <?php else: ?> <span class="points-badge points-neutral"><?php echo $answer_display_item['solution_points']; ?> points</span>
@@ -324,7 +329,7 @@ $project_name_html = htmlspecialchars($project['project_name']);
                     </p>
                     <?php if ($answer_display_item['penalty_applied']): ?>
                     <p class="penalty-info <?php echo $answer_display_item['penalty_applied'] === 'dead' ? 'dead' : ''; ?>">
-                        <strong>Pénalité appliquée:</strong>
+                        <strong>Sanction appliquée:</strong>
                         <?php echo $answer_display_item['penalty_applied'] === 'dead' ? 'Mortelle (score du bloc mis à 0)' : ($answer_display_item['penalty_applied'] . ' points'); ?>
                         pour choix prématuré.
                     </p>
@@ -340,12 +345,14 @@ $project_name_html = htmlspecialchars($project['project_name']);
         
         <div class="action-buttons">
             <?php if (!$is_guest_with_valid_token_for_results && $current_user_email): // Owner links ?>
-                <a href="/results.php?project_id=<?php echo $project['project_id']; ?>" role="button" class="secondary">Voir tous les résultats de ce projet</a>
-                <a href="/dashboard.php" role="button" class="secondary">Retour au Tableau de Bord</a>
+                <a href="/start-exam.php?project_id=<?php echo $project['project_id']; ?>" role="button" class="primary">
+                    Démarrer une nouvelle tentative
+                </a>
+                <a href="/results.php?project_id=<?php echo $project['project_id']; ?>" role="button" class="contrast">Voir tous les résultats de ce projet</a>
             <?php endif; ?>
-            <?php if ($exam_share_token_for_project): // Link to start new attempt if 'exam' share token exists for this project ?>
-                <a href="/start-exam.php?share_token=<?php echo urlencode($exam_share_token_for_project); ?>" role="button" class="contrast">
-                    <?php echo ($is_guest_with_valid_token_for_results || !$current_user_email) ? 'Faire (ou refaire) une tentative' : 'Démarrer une nouvelle tentative (Invité)'; ?>
+            <?php if ($is_guest_with_valid_token_for_results && $exam_share_token_for_project): // Owner links ?>
+                <a href="/start-exam.php?share_token=<?php echo $exam_share_token_for_project; ?>" role="button" class="primary">
+                    Démarrer une nouvelle tentative
                 </a>
             <?php endif; ?>
         </div>

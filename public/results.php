@@ -97,10 +97,7 @@ if ($project) {
         <?php endif; ?>
         
         <?php 
-        $display_attempts = $is_shared_access ? 
-            array_filter($attempts, function($a) { return $a['locked']; }) : 
-            $attempts;
-
+        $display_attempts = array_filter($attempts, function($a) { return $a['locked']; });
         if (empty($display_attempts)): 
         ?>
             <p>Aucune tentative <?php echo $is_shared_access ? 'terminée ' : ''; ?>trouvée pour ce PMP.</p>
@@ -156,16 +153,6 @@ if ($project) {
         </table>
         </div>
         <?php endif; ?>
-        
-        <div style="margin-top: 2em;">
-            <?php if ($is_shared_access && isset($all_project_share_tokens['exam'])): ?>
-                <a href="start-exam.php?share_token=<?php echo urlencode($all_project_share_tokens['exam']); ?>" role="button" class="contrast">Démarrer une nouvelle tentative</a>
-            <?php elseif (!$is_shared_access && $current_user_email): ?>
-                <a href="create-attempt.php?project_id=<?php echo $project['project_id']; ?>" role="button" class="contrast">Créer une nouvelle tentative</a>
-                <a href="share.php?project_id=<?php echo $project['project_id']; ?>" role="button" class="secondary">Gérer les options de partage</a>
-                <a href="/dashboard.php" role="button" class="secondary">Retour au tableau de bord</a>
-            <?php endif; ?>
-        </div>
     </main>
     <script>
         document.title = "Résultats - <?php echo addslashes(htmlspecialchars($project['project_name'])); ?>";

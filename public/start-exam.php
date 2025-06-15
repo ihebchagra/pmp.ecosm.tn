@@ -92,39 +92,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $project) {
         require_once __DIR__ . '/../powertrain/head.php';
     ?>
      <style>
-        <?php if ($is_shared_access): ?>
-        body { padding: 1em; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { max-width: 500px; }
-        <?php endif; ?>
     </style>
 </head>
 <body>
     <main class="container">
-        <article>
-            <header>
-                <h1><?php echo htmlspecialchars($project['project_name']); ?></h1>
-            </header>
-            <p>Vous êtes sur le point de commencer une nouvelle tentative d'examen.</p>
-            <?php if ($is_shared_access): ?>
-            <p>Cet examen est accessible via un lien de partage.</p>
-            <?php endif; ?>
+            <h1>Nouvelle Tentative PMP : <?php echo htmlspecialchars($project['project_name']); ?></h1>
+            <p>Veuillez remplir vos informations avant de commencer.</p>
 
             <form method="post">
                 <label for="student_name">
-                    Votre Nom/Prénom (ou identifiant) :
-                    <input type="text" id="student_name" name="student_name" placeholder="Ex: Jean Dupont" required>
+                    Votre Nom et Prénom :
+                    <input type="text" id="student_name" name="student_name" placeholder="Ex: Iheb Chagra" required>
                 </label>
                 <label for="stage">
-                    Stage (optionnel) :
-                    <input type="text" id="stage" name="stage" placeholder="Ex: Stage Été 2025">
+                    Stage :
+                    <input type="text" id="stage" name="stage" placeholder="Ex: Gynéco HRBA" required>
                 </label>
                 <label for="niveau">
-                    Niveau (optionnel) :
-                    <input type="text" id="niveau" name="niveau" placeholder="Ex: Débutant">
+                    Niveau :
+                    <input type="text" id="niveau" name="niveau" placeholder="Ex: DCEM3" required>
                 </label>
                 <label for="centre_exam">
-                    Centre d'examen (optionnel) :
-                    <input type="text" id="centre_exam" name="centre_exam" placeholder="Ex: Centre Ville">
+                    Centre d'examen :
+                    <input type="text" id="centre_exam" name="centre_exam" placeholder="Ex: Gynéco A CMNT" required>
                 </label>
                 <button type="submit" class="contrast">Commencer l'Examen</button>
             </form>
@@ -133,7 +123,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $project) {
                 <a href="/dashboard.php" role="button" class="secondary">Annuler et retourner au tableau de bord</a>
             </footer>
             <?php endif; ?>
-        </article>
     </main>
 </body>
 </html>

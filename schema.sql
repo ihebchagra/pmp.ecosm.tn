@@ -103,12 +103,12 @@ CREATE TABLE attempts (
   project_id INTEGER NOT NULL REFERENCES user_projects(project_id) ON DELETE CASCADE,
   is_guest BOOLEAN NOT NULL DEFAULT FALSE,
   locked BOOLEAN NOT NULL DEFAULT FALSE,
-  result INTEGER, -- Overall result/score for the attempt
+  result DOUBLE PRECISION, -- MODIFIED: Overall result/score for the attempt, now allows decimals
   stage VARCHAR(255),
   niveau VARCHAR(255),
   centre_exam VARCHAR(255),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP -- Optional: If attempts can be modified (e.g., when locked or result is set)
+  updated_at TIMESTAMP -- Optional: Can be set by a trigger or application logic
 );
 CREATE INDEX attempts_project_id_idx ON attempts(project_id);
 -- Optional trigger for attempts.updated_at if you add the column and want it auto-updated

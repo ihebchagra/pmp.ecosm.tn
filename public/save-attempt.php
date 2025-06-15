@@ -171,6 +171,7 @@ try {
     
     // Calculate raw scores for each bloc
     $bloc_raw_scores = [];
+    $bloc_is_dead = [];
     foreach ($blocs as $bloc) {
         $bloc_id = $bloc['bloc_id'];
         $raw_score = 0;
@@ -193,14 +194,21 @@ try {
                     $raw_score += (int)$answer['penalty_applied'];
                 }
             }
+        } else {
+            $has_dead = true;
         }
+
         
         // If there was a "dead" solution or penalty, set score to 0
         if ($has_dead) {
             $raw_score = 0;
+            $bloc_raw_scores[$bloc_id] = $raw_score;
+            $bloc_is_dead[$bloc_id] = true;
+        } else {
+            $bloc_raw_scores[$bloc_id] = $raw_score;
+            $bloc_is_dead[$bloc_id] = false;
         }
         
-        $bloc_raw_scores[$bloc_id] = $raw_score;
     }
     
     // Calculate min and max possible scores for each bloc
@@ -220,7 +228,7 @@ try {
                 $points = (int)$prop['solution_points'];
                 if ($points < 0) {
                     $min_score += $points;
-                } else if ($points > 0) {
+                } else if ($points >= 0) {
                     $max_score += $points;
                 }
             }
@@ -233,7 +241,9 @@ try {
         $raw_score = $bloc_raw_scores[$bloc_id] ?? 0;
         
         // Prevent division by zero
-        if ($range > 0) {
+        if ($bloc_is_dead[$bloc_id] == true ) {
+            $bloc_normalized_scores[$bloc_id] = 0;
+        } else if ($range > 0) {
             $normalized_score = ($raw_score + abs($min_score)) / $range * 20;
             // Round to 2 decimal places
             $bloc_normalized_scores[$bloc_id] = round($normalized_score, 2);
