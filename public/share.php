@@ -78,10 +78,17 @@ foreach ($shares as $share) {
     $share_tokens[$share_type] = $share['share_token'];
 }
 
+// Base URL for full links
+$base_url = 'https://pmp.ecosm.tn';
+
 // Build links - using existing files
-$exam_link = $share_tokens['exam'] ? "/start-exam.php?share_token=" . urlencode($share_tokens['exam']) : '';
-$results_link = $share_tokens['results'] ? "/results.php?share_token=" . urlencode($share_tokens['results']) : '';
-$copy_link = $share_tokens['copy'] ? "/copy-project.php?share_token=" . urlencode($share_tokens['copy']) : '';
+$exam_link_path = $share_tokens['exam'] ? "/start-exam.php?share_token=" . urlencode($share_tokens['exam']) : '';
+$results_link_path = $share_tokens['results'] ? "/results.php?share_token=" . urlencode($share_tokens['results']) : '';
+$copy_link_path = $share_tokens['copy'] ? "/copy-project.php?share_token=" . urlencode($share_tokens['copy']) : '';
+
+$exam_full_link = $exam_link_path ? $base_url . $exam_link_path : '';
+$results_full_link = $results_link_path ? $base_url . $results_link_path : '';
+$copy_full_link = $copy_link_path ? $base_url . $copy_link_path : '';
 
 // Share type explanations
 $share_explanations = [
@@ -90,8 +97,6 @@ $share_explanations = [
     'copy' => "Ce lien permet à d'autres enseignants de copier ce PMP dans leur compte pour l'utiliser comme modèle."
 ];
 
-// Base URL for full links
-$base_url = 'https://pmp.ecosm.tn';
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="light">
@@ -122,6 +127,7 @@ $base_url = 'https://pmp.ecosm.tn';
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 0.5em;
+      align-items: center;
     }
     .success-message {
       padding: 0.5em;
@@ -131,6 +137,16 @@ $base_url = 'https://pmp.ecosm.tn';
       margin: 1em 0;
       font-size: 0.9em;
       text-align: center;
+    }
+    .qrcode-container {
+      margin-top: 0.75em;
+      display: flex; /* Use flex to center if needed or manage layout */
+      justify-content: flex-start; /* Align QR code to the left */
+    }
+    .qrcode-container img {
+        border: 1px solid #eee; /* Optional: adds a light border around the QR code */
+        max-width: 20rem;
+        width: 100%
     }
   </style>
 </head>
@@ -165,11 +181,12 @@ $base_url = 'https://pmp.ecosm.tn';
         <div class="share-link">
           <label for="exam-link"><strong>Lien d'examen :</strong></label>
           <div class="grid">
-            <input id="exam-link" type="text" value="<?php echo htmlspecialchars($base_url . $exam_link); ?>" readonly>
+            <input id="exam-link" type="text" value="<?php echo htmlspecialchars($exam_full_link); ?>" readonly>
             <button type="button" class="copy-button secondary" onclick="copyToClipboard('exam-link')">Copier</button>
           </div>
+          <div id="exam-qrcode-container" class="qrcode-container"></div>
           <div style="margin-top: 0.5em;">
-            <a href="<?php echo htmlspecialchars($exam_link); ?>" target="_blank" class="secondary">Tester le lien</a>
+            <a href="<?php echo htmlspecialchars($exam_link_path); ?>" target="_blank" class="secondary">Tester le lien</a>
           </div>
         </div>
         <?php endif; ?>
@@ -187,11 +204,12 @@ $base_url = 'https://pmp.ecosm.tn';
         <div class="share-link">
           <label for="results-link"><strong>Lien des résultats :</strong></label>
           <div class="grid">
-            <input id="results-link" type="text" value="<?php echo htmlspecialchars($base_url . $results_link); ?>" readonly>
+            <input id="results-link" type="text" value="<?php echo htmlspecialchars($results_full_link); ?>" readonly>
             <button type="button" class="copy-button secondary" onclick="copyToClipboard('results-link')">Copier</button>
           </div>
+          <div id="results-qrcode-container" class="qrcode-container"></div>
           <div style="margin-top: 0.5em;">
-            <a href="<?php echo htmlspecialchars($results_link); ?>" target="_blank" class="secondary">Tester le lien</a>
+            <a href="<?php echo htmlspecialchars($results_link_path); ?>" target="_blank" class="secondary">Tester le lien</a>
           </div>
         </div>
         <?php endif; ?>
@@ -209,11 +227,12 @@ $base_url = 'https://pmp.ecosm.tn';
         <div class="share-link">
           <label for="copy-link"><strong>Lien de copie :</strong></label>
           <div class="grid">
-            <input id="copy-link" type="text" value="<?php echo htmlspecialchars($base_url . $copy_link); ?>" readonly>
+            <input id="copy-link" type="text" value="<?php echo htmlspecialchars($copy_full_link); ?>" readonly>
             <button type="button" class="copy-button secondary" onclick="copyToClipboard('copy-link')">Copier</button>
           </div>
+          <div id="copy-qrcode-container" class="qrcode-container"></div>
           <div style="margin-top: 0.5em;">
-            <a href="<?php echo htmlspecialchars($copy_link); ?>" target="_blank" class="secondary">Tester le lien</a>
+            <a href="<?php echo htmlspecialchars($copy_link_path); ?>" target="_blank" class="secondary">Tester le lien</a>
           </div>
         </div>
         <?php endif; ?>
@@ -223,10 +242,6 @@ $base_url = 'https://pmp.ecosm.tn';
     <button type="submit" class="contrast">Sauvegarder les paramètres de partage</button>
   </form>
 
-  <div style="margin-top:2em;">
-    <a href="/results.php?project_id=<?php echo $project_id; ?>" role="button" class="secondary">Voir les résultats</a>
-    <a href="/dashboard.php" role="button" class="secondary">&larr; Retour au tableau de bord</a>
-  </div>
 </main>
 
 <script>
@@ -235,12 +250,10 @@ function copyToClipboard(elementId) {
   element.select();
   document.execCommand('copy');
   
-  // Visual feedback
   const button = element.nextElementSibling;
   const originalText = button.textContent;
   button.textContent = "Copié !";
   
-  // Add success class temporarily
   button.classList.add("primary");
   button.classList.remove("secondary");
   
@@ -250,6 +263,36 @@ function copyToClipboard(elementId) {
     button.classList.add("secondary");
   }, 1500);
 }
+
+function generateQRCode(containerId, linkText, size = 128) {
+  const container = document.getElementById(containerId);
+  if (container && linkText) {
+    // Clear previous QR code if any
+    container.innerHTML = ''; 
+    new QRCode(container, {
+      text: linkText,
+      width: size,
+      height: size,
+      colorDark : "#000000",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.H
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  <?php if ($share_tokens['exam'] && $exam_full_link): ?>
+  generateQRCode('exam-qrcode-container', '<?php echo htmlspecialchars($exam_full_link, ENT_QUOTES, 'UTF-8'); ?>');
+  <?php endif; ?>
+  
+  <?php if ($share_tokens['results'] && $results_full_link): ?>
+  generateQRCode('results-qrcode-container', '<?php echo htmlspecialchars($results_full_link, ENT_QUOTES, 'UTF-8'); ?>');
+  <?php endif; ?>
+  
+  <?php if ($share_tokens['copy'] && $copy_full_link): ?>
+  generateQRCode('copy-qrcode-container', '<?php echo htmlspecialchars($copy_full_link, ENT_QUOTES, 'UTF-8'); ?>');
+  <?php endif; ?>
+});
 </script>
 </body>
 </html>
