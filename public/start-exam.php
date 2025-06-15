@@ -1,87 +1,139 @@
 <?php
+// Current Date and Time (UTC): 2025-06-15 17:13:11
+// Current User's Login: ihebchagra
 require_once __DIR__ . '/../powertrain/db.php';
 $db = get_db();
 
+$share_token_from_url = isset($_GET['share_token']) ? $_GET['share_token'] : null;
+$project_id_from_url = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0; // For logged-in user starting for their project
+
 $project = null;
-$project_id = null;
-$is_guest = false;
-$student_name = '';
+$is_shared_access = false;
+$current_user_email = null; // Will be set if user is logged in
 
-// Guest access: via share_token
-if (isset($_GET['share_token'])) {
-    $token = $_GET['share_token'];
-    $stmt = $db->prepare('SELECT project_id FROM project_shares WHERE share_token = :token');
-    $stmt->execute(['token' => $token]);
-    $row = $stmt->fetch();
-    if ($row) {
-        $project_id = $row['project_id'];
-        $is_guest = true;
+if ($share_token_from_url) {
+    // Access via share token (for guests)
+    $stmt_share = $db->prepare('
+        SELECT p.* 
+        FROM project_shares s 
+        JOIN user_projects p ON s.project_id = p.project_id 
+        WHERE s.share_token = :token AND s.share_type = :type
+    ');
+    $stmt_share->execute(['token' => $share_token_from_url, 'type' => 'exam']);
+    $project = $stmt_share->fetch(PDO::FETCH_ASSOC);
+
+    if ($project) {
+        $is_shared_access = true;
     } else {
-        http_response_code(404);
-        echo "<main class='container'><h1>Lien invalide ou non partagé.</h1></main>";
-        exit;
+        die("Token de partage invalide ou ne permettant pas de démarrer cet examen.");
     }
-}
-
-// Authenticated access: via project_id and session
-if (!$is_guest) {
+} elseif ($project_id_from_url) {
+    // Logged-in user starting an exam for one of their projects
     require_once __DIR__ . '/../powertrain/auth.php';
-    require_login();
-    $user = $_SESSION['user'];
-    $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+    require_login(); // Login required if no token and project_id is specified
+    $current_user_email = $_SESSION['user']['email'];
 
-    $stmt = $db->prepare('SELECT * FROM user_projects WHERE project_id = :pid AND user_id = :uid');
-    $stmt->execute(['pid' => $project_id, 'uid' => $user['email']]);
-    $project = $stmt->fetch();
+    $stmt_project_owner = $db->prepare('SELECT * FROM user_projects WHERE project_id = :pid AND user_id = :uid');
+    $stmt_project_owner->execute(['pid' => $project_id_from_url, 'uid' => $current_user_email]);
+    $project = $stmt_project_owner->fetch(PDO::FETCH_ASSOC);
 
     if (!$project) {
-        header('Location: /dashboard.php');
-        exit;
+        die("Projet introuvable ou vous n'êtes pas autorisé à démarrer un examen pour ce projet.");
     }
 } else {
-    // Guest: fetch project for display
-    $stmt = $db->prepare('SELECT * FROM user_projects WHERE project_id = :pid');
-    $stmt->execute(['pid' => $project_id]);
-    $project = $stmt->fetch();
-    if (!$project) {
-        http_response_code(404);
-        echo "<main class='container'><h1>Projet introuvable.</h1></main>";
-        exit;
-    }
+    die("Informations manquantes pour démarrer l'examen (token de partage ou ID de projet requis).");
 }
 
-$project_id_html = htmlspecialchars($project['project_id']);
-$share_token_input = $is_guest ? '<input type="hidden" name="share_token" value="' . htmlspecialchars($token) . '">' : '';
-$student_name_input = <<<HTML
-    <div>
-        <label for="student_name">Nom de l'étudiant:</label>
-        <input type="text" id="student_name" name="student_name" required>
-    </div>
-HTML;
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $project) {
+    $student_name = trim($_POST['student_name'] ?? 'Participant Anonyme');
+    if (empty($student_name)) $student_name = 'Participant Anonyme';
+    
+    $stage = trim($_POST['stage'] ?? '');
+    $niveau = trim($_POST['niveau'] ?? '');
+    $centre_exam = trim($_POST['centre_exam'] ?? '');
 
-// For authenticated users, you might want to autofill the student name with their display name, or not ask at all.
-// If you want to skip the name input for authenticated users, comment out $student_name_input in that branch.
+    $db->beginTransaction();
+    try {
+        $stmt_insert_attempt = $db->prepare('
+            INSERT INTO attempts (project_id, student_name, is_guest, stage, niveau, centre_exam) 
+            VALUES (:pid, :sname, :is_guest, :stage, :niveau, :centre_exam)
+        ');
+        $stmt_insert_attempt->execute([
+            'pid' => $project['project_id'],
+            'sname' => $student_name,
+            'is_guest' => $is_shared_access ? 1 : 0,
+            'stage' => $stage,
+            'niveau' => $niveau,
+            'centre_exam' => $centre_exam
+        ]);
+        $attempt_id = $db->lastInsertId();
+        $db->commit();
 
+        $redirect_url = "exam.php?attempt_id=" . $attempt_id;
+        if ($is_shared_access && $share_token_from_url) {
+            $redirect_url .= "&share_token=" . urlencode($share_token_from_url);
+        }
+        header("Location: " . $redirect_url);
+        exit;
+
+    } catch (Exception $e) {
+        $db->rollBack();
+        die("Erreur lors de la création de la tentative: " . $e->getMessage());
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <title>Nouvelle Tentative</title>
-    <?php require_once __DIR__ . '/../powertrain/head.php' ?>
+    <title>Démarrer l'Examen - <?php echo htmlspecialchars($project['project_name']); ?></title>
+    <?php
+        require_once __DIR__ . '/../powertrain/head.php';
+    ?>
+     <style>
+        <?php if ($is_shared_access): ?>
+        body { padding: 1em; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { max-width: 500px; }
+        <?php endif; ?>
+    </style>
 </head>
 <body>
-<main class="container">
-<h1>Nouvelle Tentative PMP : <?php echo htmlspecialchars($project['project_name']); ?></h1>
-<form method="post" action="/create-attempt.php">
-    <input type="hidden" name="project_id" value="<?php echo $project_id_html; ?>">
-    <?php echo $share_token_input; ?>
-    <?php echo $student_name_input; ?>
-    <button type="submit">Commencer Tentative</button>
-</form>
-</main>
-<script>
-    document.title = "Nouvelle Tentative";
-</script>
+    <main class="container">
+        <article>
+            <header>
+                <h1><?php echo htmlspecialchars($project['project_name']); ?></h1>
+            </header>
+            <p>Vous êtes sur le point de commencer une nouvelle tentative d'examen.</p>
+            <?php if ($is_shared_access): ?>
+            <p>Cet examen est accessible via un lien de partage.</p>
+            <?php endif; ?>
+
+            <form method="post">
+                <label for="student_name">
+                    Votre Nom/Prénom (ou identifiant) :
+                    <input type="text" id="student_name" name="student_name" placeholder="Ex: Jean Dupont" required>
+                </label>
+                <label for="stage">
+                    Stage (optionnel) :
+                    <input type="text" id="stage" name="stage" placeholder="Ex: Stage Été 2025">
+                </label>
+                <label for="niveau">
+                    Niveau (optionnel) :
+                    <input type="text" id="niveau" name="niveau" placeholder="Ex: Débutant">
+                </label>
+                <label for="centre_exam">
+                    Centre d'examen (optionnel) :
+                    <input type="text" id="centre_exam" name="centre_exam" placeholder="Ex: Centre Ville">
+                </label>
+                <button type="submit" class="contrast">Commencer l'Examen</button>
+            </form>
+            <?php if (!$is_shared_access && $current_user_email): ?>
+            <footer style="margin-top:1em;">
+                <a href="/dashboard.php" role="button" class="secondary">Annuler et retourner au tableau de bord</a>
+            </footer>
+            <?php endif; ?>
+        </article>
+    </main>
 </body>
 </html>
