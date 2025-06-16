@@ -174,7 +174,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
             <li>(+1) choix utile</li>
             <li>(+2) choix essentiel</li>
         </ul>
-        <p><b>Tout choix mettant en danger le pronostic vital de la patiente entraînera l'arrêt immédiat de l'épreuve.</b></p>
+        <p><b>Tout choix mettant en danger le pronostic vital entraînera l'arrêt immédiat de l'épreuve.</b></p>
         <p>Cliquez sur "Commencer l'Épreuve" pour démarrer l'épreuve.</p>
         <div class="centered" style="margin-top:2em; margin-bottom:2em;">
             <button @click="startExam()" class="contrast">Commencer l'Épreuve</button>
@@ -193,7 +193,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                     </template>
                 </div>
                 <h4 style="margin-top: 1rem">Énoncé :</h4>
-                <div class="problem-text" x-html="currentBloc().problem_text ? currentBloc().problem_text.replace(/\n/g, '<br>') : ''"></div>
+                <div class="problem-text" x-html="currentBloc().problem_text ? currentBloc().problem_text : ''"></div>
                 <p x-show="currentBlocState() && currentBlocState().timeLeft !== null">
                     <b>Temps Restant pour ce Bloc</b>:
                     <span class="timer" x-text="currentBlocState() ? formatTime(currentBlocState().timeLeft) : 'N/A'"></span>
@@ -217,7 +217,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                                 <p><strong x-text="proposition.proposition_text"></strong></p>
                                 <div x-show="isPropositionChosen(proposition.proposition_id)" class="solution-text" x-transition>
                                     <p x-text="getPointsLabel(proposition.solution_points)"></p>
-                                    <p x-html="proposition.solution_text ? proposition.solution_text.replace(/\n/g, '<br>') : ''"></p>
+                                    <p x-html="proposition.solution_text ? proposition.solution_text : ''"></p>
                                     <template x-if="getAppliedPenaltyForProposition(proposition.proposition_id)">
                                         <p :class="{'penalty-info': true, 'dead': getPenaltyTypeForProposition(proposition.proposition_id) === 'dead'}">
                                             <strong>Sanction appliquée:</strong>

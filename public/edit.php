@@ -137,7 +137,7 @@ $penalty_options = [
 
             <h3>Blocs d'Énoncé</h3>
             <div id="blocsContainer">
-                <template x-for="(bloc, blocIndex) in project.blocs" :key="bloc.bloc_id || blocIndex">
+                <template x-for="(bloc, blocIndex) in project.blocs" >
                     <article class="bloc">
                         <input type="hidden" :name="`blocs[${blocIndex}][bloc_id]`" x-model="bloc.bloc_id">
                         
@@ -150,13 +150,13 @@ $penalty_options = [
                         
                         <label>Texte de l'énoncé:</label>
                         <textarea :name="`blocs[${blocIndex}][problem_text]`" x-model="bloc.problem_text" rows="3" required></textarea>
-                        <label>Temps limite (secondes):</label>
-                        <input type="number" :name="`blocs[${blocIndex}][time_limit_seconds]`" x-model.number="bloc.time_limit_seconds" min="0">
+                        <label>Durée (secondes):</label>
+                        <input type="number" :name="`blocs[${blocIndex}][time_limit_seconds]`" placeholder="Ex: 300" x-model.number="bloc.time_limit_seconds" min="0" required>
 
                         <h5>Images</h5>
                         <div>
                             <!-- Existing Images -->
-                            <template x-for="(image, imgIndex) in bloc.images" :key="image.image_id">
+                            <template x-for="(image, imgIndex) in bloc.images" >
                                 <div style="display: inline-block; margin: 5px; position: relative;">
                                     <img :src="'/' + image.image_path" class="image-preview">
                                     <input type="hidden" :name="`blocs[${blocIndex}][existing_images][${imgIndex}][image_id]`" :value="image.image_id">
@@ -174,7 +174,7 @@ $penalty_options = [
                         </div>
 
                         <h5 style="margin-top: 1em;">Propositions</h5>
-                        <template x-for="(prop, propIndex) in bloc.propositions" :key="prop.proposition_id || propIndex">
+                        <template x-for="(prop, propIndex) in bloc.propositions" >
                             <section class="proposition">
                                 <input type="hidden" :name="`blocs[${blocIndex}][propositions][${propIndex}][proposition_id]`" x-model="prop.proposition_id">
                                 
@@ -197,7 +197,7 @@ $penalty_options = [
                                 </select>
 
                                 <!-- NEW APPROACH: Show precedent as text with modify option -->
-                                <label>Proposition précédente pour pénalité:</label>
+                                <label>Sanction si choisie avant la proposition :</label>
                                 <div>
                                     <!-- Static display mode -->
                                     <div x-show="!prop.modify_precedent" class="precedent-info">
@@ -206,7 +206,7 @@ $penalty_options = [
                                             <input type="hidden" :name="`blocs[${blocIndex}][propositions][${propIndex}][precedent_proposition_for_penalty_id]`" :value="prop.precedent_proposition_for_penalty_id">
                                         </span>
                                         <span x-show="!prop.precedent_text">
-                                            <strong>Actuellement:</strong> Aucune proposition précédente
+                                            <strong>Actuellement:</strong> Aucune proposition qui doit précéder
                                             <input type="hidden" :name="`blocs[${blocIndex}][propositions][${propIndex}][precedent_proposition_for_penalty_id]`" value="">
                                         </span>
                                         <button type="button" @click="prop.modify_precedent = true" class="secondary" style="margin-left: 1em; padding: 0.2em 0.5em;">Modifier</button>
@@ -216,7 +216,7 @@ $penalty_options = [
                                     <div x-show="prop.modify_precedent">
                                         <select :name="`blocs[${blocIndex}][propositions][${propIndex}][precedent_proposition_for_penalty_id]`" x-model="prop.precedent_proposition_for_penalty_id">
                                             <option value="">Aucune</option>
-                                            <template x-for="otherProp in bloc.propositions.filter(p => p !== prop)" :key="otherProp.proposition_id || 'new_' + propIndex">
+                                            <template x-for="otherProp in bloc.propositions.filter(p => p !== prop)" >
                                                 <option :value="otherProp.proposition_id" 
                                                         x-text="`Prop ${bloc.propositions.indexOf(otherProp) + 1}${otherProp.proposition_id ? ' (ID: ' + otherProp.proposition_id + ')' : ''} - ${otherProp.proposition_text ? otherProp.proposition_text.substring(0,20) + '...' : 'Nouvelle proposition'}`"></option>
                                             </template>
@@ -225,7 +225,7 @@ $penalty_options = [
                                     </div>
                                 </div>
 
-                                <label>Pénalité si choisie avant:</label>
+                                <label>Nature de la sanction:</label>
                                 <select :name="`blocs[${blocIndex}][propositions][${propIndex}][penalty_value_if_chosen_early]`" x-model="prop.penalty_value_if_chosen_early">
                                     <?php foreach ($penalty_options as $opt): ?>
                                     <option value="<?php echo $opt['value']; ?>"><?php echo htmlspecialchars($opt['label']); ?></option>
@@ -274,7 +274,7 @@ document.addEventListener('alpine:init', () => {
             this.project.blocs.push({
                 bloc_id: null,
                 problem_text: '',
-                time_limit_seconds: null,
+                time_limit_seconds: 300,
                 propositions: [],
                 images: []
             });
