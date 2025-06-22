@@ -12,6 +12,7 @@ $is_shared_access = false;
 $current_user_email = null; 
 
 // --- Determine access type and fetch project ---
+// ... (This entire section remains unchanged)
 if ($share_token_from_url) {
     $stmt_share = $db->prepare('SELECT p.* FROM project_shares s JOIN user_projects p ON s.project_id = p.project_id WHERE s.share_token = :token AND s.share_type = :type');
     $stmt_share->execute(['token' => $share_token_from_url, 'type' => 'results']);
@@ -29,7 +30,6 @@ if ($share_token_from_url) {
     $current_user_email = $_SESSION['user']['email'];
 
     if (!$project_id_from_url) {
-        // If no project_id is provided by a logged-in user, redirect to dashboard or show error
         header('Location: /dashboard.php?error=' . urlencode("ID de projet non spécifié."));
         exit;
     }
@@ -43,12 +43,14 @@ if ($share_token_from_url) {
     }
 }
 
+
 // --- Fetch attempts for the identified project ---
 $stmt_attempts = $db->prepare('SELECT * FROM attempts WHERE project_id = :pid ORDER BY created_at DESC');
 $stmt_attempts->execute(['pid' => $project['project_id']]);
 $attempts = $stmt_attempts->fetchAll(PDO::FETCH_ASSOC);
 
-// --- Get all share tokens for this project (for "start new attempt" link) ---
+// --- Get all share tokens for this project ---
+// ... (This section remains unchanged)
 $all_project_share_tokens = [];
 if ($project) {
     $stmt_all_shares = $db->prepare('SELECT share_type, share_token FROM project_shares WHERE project_id = :pid');
@@ -57,24 +59,30 @@ if ($project) {
         $all_project_share_tokens[$row['share_type']] = $row['share_token'];
     }
 }
+
+// NEW: Prepare base URL for export links
+$export_base_url = "export-results.php?project_id=" . $project['project_id'];
+if ($is_shared_access) {
+    $export_base_url .= "&share_token=" . urlencode($share_token_from_url);
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <title>Résultats - <?php echo htmlspecialchars($project['project_name']); ?></title>
-    <?php
-        require_once __DIR__ . '/../powertrain/head.php';
-    ?>
+    <?php require_once __DIR__ . '/../powertrain/head.php'; ?>
     <style>
         .button-group { display: flex; gap: 8px; }
         .button-group .button { margin: 0; }
         .score { font-weight: bold; }
         .project-title { margin-bottom: 0.5em; }
-        table th, table td { white-space: nowrap; } /* Prevent text wrapping in table cells for better alignment */
+        .actions-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5em; flex-wrap: wrap; gap: 1em; }
+        table th, table td { white-space: nowrap; } 
         <?php if ($is_shared_access): ?>
         body { padding: 1em; }
-        .container { max-width: 1000px; } /* Wider for more columns */
+        .container { max-width: 1000px; }
         <?php endif; ?>
     </style>
 </head>
@@ -88,7 +96,14 @@ if ($project) {
     <?php endif; ?>
     
     <main class="container">
-        <h1 class="project-title">Résultats - <?php echo htmlspecialchars($project['project_name']); ?></h1>
+        <!-- NEW: Header with Export Buttons -->
+        <div class="actions-header">
+            <h1 class="project-title" style="margin-bottom:0;">Résultats - <?php echo htmlspecialchars($project['project_name']); ?></h1>
+            <div class="button-group">
+                <a href="<?php echo $export_base_url; ?>&type=summary" role="button" class="secondary outline">Export Résumé (CSV)</a>
+                <a href="<?php echo $export_base_url; ?>&type=detailed" role="button" class="secondary outline">Export Détaillé (CSV)</a>
+            </div>
+        </div>
         
         <?php if ($is_shared_access): ?>
         <div role="alert" style="margin-bottom:1.5em;">
@@ -102,7 +117,7 @@ if ($project) {
         ?>
             <p>Aucune tentative <?php echo $is_shared_access ? 'terminée ' : ''; ?>trouvée pour ce PMP.</p>
         <?php else: ?>
-        <div style="overflow-x: auto;"> <!-- Add horizontal scroll for smaller screens -->
+        <div style="overflow-x: auto;"> 
         <table role="grid">
             <thead>
                 <tr>
@@ -117,6 +132,7 @@ if ($project) {
             </thead>
             <tbody>
             <?php foreach ($display_attempts as $attempt):
+                // ... (This loop remains unchanged)
                 $date = date('d/m/Y H:i', strtotime($attempt['created_at']));
                 $score = $attempt['result'] !== null ? htmlspecialchars($attempt['result']) : '-';
                 $student = htmlspecialchars($attempt['student_name']);
