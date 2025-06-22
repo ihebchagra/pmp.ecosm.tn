@@ -139,12 +139,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_copy']) && $s
             $stmt_all_source_props->execute(['pid' => $source_project['project_id']]);
             $all_source_props_data = $stmt_all_source_props->fetchAll(PDO::FETCH_ASSOC);
 
+            $stmt_source_prop_images = $db->prepare('SELECT * FROM proposition_images WHERE proposition_id = :pid AND is_deleted = FALSE');
+            $stmt_insert_prop_image = $db->prepare('INSERT INTO proposition_images (proposition_id, image_path) VALUES (:pid, :path)');
+
             foreach ($all_source_props_data as $source_prop) {
                 if (!isset($bloc_id_map[$source_prop['bloc_id']])) continue;
                 $stmt_insert_prop = $db->prepare('INSERT INTO bloc_propositions (bloc_id, proposition_text, solution_text, solution_points) VALUES (:bid, :ptext, :stext, :spoints)');
                 $stmt_insert_prop->execute(['bid' => $bloc_id_map[$source_prop['bloc_id']], 'ptext' => $source_prop['proposition_text'], 'stext' => $source_prop['solution_text'], 'spoints' => $source_prop['solution_points']]);
                 $new_prop_id = $db->lastInsertId();
                 $prop_id_map[$source_prop['proposition_id']] = $new_prop_id;
+
+                // --- NEW: Copy proposition images ---
+                $stmt_source_prop_images->execute(['pid' => $source_prop['proposition_id']]);
+                $source_prop_images_data = $stmt_source_prop_images->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach($source_prop_images_data as $prop_image) {
+                    $source_image_db_path = $prop_image['image_path'];
+                    // Use a more robust path construction
+                    $source_image_server_path = realpath($app_base_path . '/' . ltrim($source_image_db_path, '/'));
+
+                    if (!$source_image_server_path || !file_exists($source_image_server_path)) {
+                        $file_operation_errors[] = "Image de proposition source introuvable: " . htmlspecialchars($source_image_db_path);
+                        error_log("COPY_PROJECT Prop Image Error: Source image not found at server path: " . $source_image_server_path . " (DB path: " . $source_image_db_path . ")");
+                        continue;
+                    }
+
+                    $upload_dir = 'uploads/project_images/';
+                    $ext = pathinfo($source_image_server_path, PATHINFO_EXTENSION);
+                    $new_filename = uniqid('img_copy_', true) . '.' . $ext;
+                    $new_image_db_path = $upload_dir . $new_filename;
+                    $new_image_server_path = $app_base_path . '/' . $new_image_db_path;
+
+                    if (copy($source_image_server_path, $new_image_server_path)) {
+                        $stmt_insert_prop_image->execute(['pid' => $new_prop_id, 'path' => $new_image_db_path]);
+                    } else {
+                        $file_operation_errors[] = "Échec de la copie de l'image de proposition: " . htmlspecialchars(basename($source_image_db_path));
+                        error_log("COPY_PROJECT Prop Image Error: Failed to copy image from '" . $source_image_server_path . "' to '" . $new_image_server_path . "'");
+                    }
+                }
+                // --- END NEW ---
             }
 
             foreach ($all_source_props_data as $source_prop) {

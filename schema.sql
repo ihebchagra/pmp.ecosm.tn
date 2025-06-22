@@ -1,8 +1,3 @@
--- Full Schema Drop and Recreate
--- Current Date and Time (for reference): 2025-06-15 08:59:18 UTC
--- User: ihebchagra
-
--- Drop existing tables and types in a safe order
 DROP TABLE IF EXISTS attempt_answers CASCADE;
 DROP TABLE IF EXISTS bloc_propositions CASCADE;
 DROP TABLE IF EXISTS project_questions CASCADE; -- Old table, ensure it's dropped if it exists from previous versions
@@ -69,6 +64,16 @@ CREATE TABLE bloc_images (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX bloc_images_bloc_id_idx ON bloc_images(bloc_id);
+
+-- proposition images
+CREATE TABLE proposition_images (
+  image_id SERIAL PRIMARY KEY,
+  proposition_id INTEGER NOT NULL REFERENCES bloc_propositions(proposition_id) ON DELETE CASCADE,
+  image_path VARCHAR(255) NOT NULL,
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX proposition_images_proposition_id_idx ON proposition_images(proposition_id);
 
 -- 4. bloc_propositions (Represents a question/proposition within a bloc)
 CREATE TABLE bloc_propositions (
@@ -140,45 +145,3 @@ CREATE TABLE project_shares (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX project_shares_project_id_idx ON project_shares(project_id);
-
--- Grant permissions (Example for a user 'your_app_user', replace as needed)
--- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO your_app_user;
--- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO your_app_user;
--- GRANT EXECUTE ON FUNCTION trigger_set_timestamp() TO your_app_user;
-
--- Reminder about the inter-bloc constraint for precedent_proposition_for_penalty_id:
--- It's recommended to enforce via application logic or a more complex database trigger
--- that 'precedent_proposition_for_penalty_id' must reference a 'proposition_id'
--- that belongs to the same 'bloc_id' as the proposition defining the penalty.
--- Example (Conceptual Trigger - requires careful implementation):
-/*
-CREATE OR REPLACE FUNCTION check_penalty_precedent_bloc_consistency()
-RETURNS TRIGGER AS $$
-DECLARE
-  current_bloc_id INTEGER;
-  precedent_bloc_id INTEGER;
-BEGIN
-  -- Get bloc_id of the current proposition
-  SELECT bloc_id INTO current_bloc_id FROM project_blocs WHERE bloc_id = NEW.bloc_id;
-
-  -- If precedent_proposition_for_penalty_id is set, check its bloc_id
-  IF NEW.precedent_proposition_for_penalty_id IS NOT NULL THEN
-    SELECT bp.bloc_id INTO precedent_bloc_id
-    FROM bloc_propositions bp
-    WHERE bp.proposition_id = NEW.precedent_proposition_for_penalty_id;
-
-    IF precedent_bloc_id IS NULL OR precedent_bloc_id <> current_bloc_id THEN
-      RAISE EXCEPTION 'Precedent proposition for penalty must belong to the same bloc.';
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER ensure_penalty_precedent_same_bloc
-BEFORE INSERT OR UPDATE ON bloc_propositions
-FOR EACH ROW
-EXECUTE FUNCTION check_penalty_precedent_bloc_consistency();
-*/
-
--- End of Schema

@@ -69,15 +69,27 @@ if (empty($blocs_data)) { die("Ce projet ne contient aucun bloc d'énoncé."); }
 
 $stmt_propositions = $db->prepare('SELECT * FROM bloc_propositions WHERE bloc_id = :bid ORDER BY proposition_id ASC');
 $stmt_images = $db->prepare('SELECT image_path FROM bloc_images WHERE bloc_id = :bid AND is_deleted = FALSE ORDER BY image_id ASC');
+// NEW: Prepare statement for proposition images
+$stmt_prop_images = $db->prepare('SELECT image_path FROM proposition_images WHERE proposition_id = :pid AND is_deleted = FALSE ORDER BY image_id ASC');
 
 $exam_structure = [];
 foreach ($blocs_data as $bloc_row) {
     $current_bloc_data = $bloc_row;
+    
+    // Fetch propositions
     $stmt_propositions->execute(['bid' => $bloc_row['bloc_id']]);
     $propositions_for_bloc = $stmt_propositions->fetchAll(PDO::FETCH_ASSOC);
-    shuffle($propositions_for_bloc);
+
+    // NEW: Fetch images for each proposition and add them to the data
+    foreach ($propositions_for_bloc as $key => $prop) {
+        $stmt_prop_images->execute(['pid' => $prop['proposition_id']]);
+        $propositions_for_bloc[$key]['images'] = $stmt_prop_images->fetchAll(PDO::FETCH_COLUMN); // Fetch just paths
+    }
+    
+    shuffle($propositions_for_bloc); // Shuffle AFTER adding images
     $current_bloc_data['propositions'] = $propositions_for_bloc;
 
+    // Fetch bloc images
     $stmt_images->execute(['bid' => $bloc_row['bloc_id']]);
     $current_bloc_data['images'] = $stmt_images->fetchAll(PDO::FETCH_ASSOC);
     $exam_structure[] = $current_bloc_data;
@@ -116,12 +128,13 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
         }
         .proposition-item:hover:not(.chosen):not(.disabled) { background-color: #e9e9e9; border-color: #ccc; }
         .proposition-item.chosen { background-color: #d1e7dd; border-color: #a3cfbb; cursor: default; }
-        .proposition-item.disabled { cursor: not-allowed; opacity: 0.7; }
+        .proposition-item.disabled { cursor: not-allowed }
         .proposition-item.dead-chosen { background-color: #f8d7da; border-color: #f5c6cb;}
         .solution-text { margin-top: 0.5em; padding: 0.5em; background-color: #fff; border: 1px dashed #ddd; font-size:0.9em;}
         .penalty-info { color: #c57500; font-size: 0.85em; margin-top: 0.3em;}
         .penalty-info.dead { color: #dc3545; font-weight: bold; }
         .bloc-images img { max-width: 36rem; max-height:auto; width: 100%;  display: block; margin: 0 auto; align-self: center; border: 1px solid #ddd; border-radius:4px;}
+        .prop-images img { max-width: 36rem; max-height:auto; width: 100%;  display: block; margin: 0 auto; align-self: center; border: 1px solid #ddd; border-radius:4px;}
         [x-cloak] { display: none !important; }
         .timer { font-weight: bold; color: var(--pico-primary); }
         .modal-is-open dialog[open] { display: flex; }
@@ -218,6 +231,11 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                                 <div x-show="isPropositionChosen(proposition.proposition_id)" class="solution-text" x-transition>
                                     <p x-text="getPointsLabel(proposition.solution_points)"></p>
                                     <p x-html="proposition.solution_text ? proposition.solution_text : ''"></p>
+                                    <div x-show="proposition.images && proposition.images.length > 0" class="prop-images">
+                                        <template x-for="image_path in proposition.images" :key="image_path">
+                                            <img :src="'/' + image_path" :alt="'Image de la proposition'">
+                                        </template>
+                                    </div>
                                     <template x-if="getAppliedPenaltyForProposition(proposition.proposition_id)">
                                         <p :class="{'penalty-info': true, 'dead': getPenaltyTypeForProposition(proposition.proposition_id) === 'dead'}">
                                             <strong>Sanction appliquée:</strong>

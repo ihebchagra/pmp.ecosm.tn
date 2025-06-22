@@ -27,6 +27,10 @@ if ($project_id > 0) {
     $stmt_blocs = $db->prepare("SELECT * FROM project_blocs WHERE project_id = :pid ORDER BY sequence_number ASC");
     $stmt_blocs->execute(['pid' => $project_id]);
     $blocs = $stmt_blocs->fetchAll(PDO::FETCH_ASSOC);
+    
+    // NEW: Prepare statement for proposition images
+    $stmt_prop_images = $db->prepare("SELECT * FROM proposition_images WHERE proposition_id = :pid AND is_deleted = FALSE ORDER BY image_id ASC");
+
 
     foreach ($blocs as $bloc) {
         $bloc_data = [
@@ -51,16 +55,28 @@ if ($project_id > 0) {
         $propositions = $stmt_props->fetchAll(PDO::FETCH_ASSOC);
         
         foreach ($propositions as $prop) {
+            // NEW: Fetch images for this proposition
+            $stmt_prop_images->execute(['pid' => $prop['proposition_id']]);
+            $prop_images = $stmt_prop_images->fetchAll(PDO::FETCH_ASSOC);
+            $prop_images_data = [];
+            foreach ($prop_images as $p_img) {
+                $prop_images_data[] = [
+                    'image_id' => $p_img['image_id'],
+                    'image_path' => $p_img['image_path']
+                ];
+            }
+
             $bloc_data['propositions'][] = [
                 'proposition_id' => $prop['proposition_id'],
                 'proposition_text' => $prop['proposition_text'],
                 'solution_text' => $prop['solution_text'],
                 'solution_points' => $prop['solution_points'],
                 'precedent_proposition_for_penalty_id' => $prop['precedent_proposition_for_penalty_id'],
-                'precedent_text' => $prop['precedent_text'], // Added text of precedent proposition
-                'precedent_id' => $prop['precedent_id'],     // Added ID of precedent proposition
-                'modify_precedent' => false, // Flag to show modify UI
-                'penalty_value_if_chosen_early' => $prop['penalty_value_if_chosen_early']
+                'precedent_text' => $prop['precedent_text'], 
+                'precedent_id' => $prop['precedent_id'],     
+                'modify_precedent' => false,
+                'penalty_value_if_chosen_early' => $prop['penalty_value_if_chosen_early'],
+                'images' => $prop_images_data // NEW: Add images to the proposition data
             ];
         }
 
@@ -153,9 +169,8 @@ $penalty_options = [
                         <label>Durée (secondes):</label>
                         <input type="number" :name="`blocs[${blocIndex}][time_limit_seconds]`" placeholder="Ex: 300" x-model.number="bloc.time_limit_seconds" min="0" required>
 
-                        <h5>Images</h5>
+                        <h5>Images du Bloc</h5>
                         <div>
-                            <!-- Existing Images -->
                             <template x-for="(image, imgIndex) in bloc.images" >
                                 <div style="display: inline-block; margin: 5px; position: relative;">
                                     <img :src="'/' + image.image_path" class="image-preview">
@@ -169,7 +184,7 @@ $penalty_options = [
                             </template>
                         </div>
                         <div style="margin-top: 1em;">
-                            <label>Ajouter nouvelles images:</label>
+                            <label>Ajouter nouvelles images au bloc:</label>
                             <input type="file" :name="`bloc_new_images_${blocIndex}[]`" multiple accept="image/*">
                         </div>
 
@@ -187,8 +202,33 @@ $penalty_options = [
 
                                 <label>Texte de la proposition:</label>
                                 <textarea :name="`blocs[${blocIndex}][propositions][${propIndex}][proposition_text]`" x-model="prop.proposition_text" rows="2" required></textarea>
-                                <label>Texte de la solution:</label>
+                                
+                                
+                                <label>Feedback de la solution:</label>
                                 <textarea :name="`blocs[${blocIndex}][propositions][${propIndex}][solution_text]`" x-model="prop.solution_text" rows="2" required></textarea>
+
+                                <!-- Proposition Images Section -->
+                                <div style="border: 1px solid #e0e0e0; padding: 0.5em; margin: 1em 0; border-radius: 4px;">
+                                    <label>Images du Feedback</label>
+                                    <div>
+                                        <!-- Existing Images -->
+                                        <template x-for="(image, imgIndex) in prop.images" >
+                                            <div style="display: inline-block; margin: 5px; position: relative;">
+                                                <img :src="'/' + image.image_path" class="image-preview">
+                                                <input type="hidden" :name="`blocs[${blocIndex}][propositions][${propIndex}][existing_images][${imgIndex}][image_id]`" :value="image.image_id">
+                                                <input type="hidden" :name="`blocs[${blocIndex}][propositions][${propIndex}][existing_images][${imgIndex}][image_path]`" :value="image.image_path">
+                                                <div>
+                                                    <input type="checkbox" :id="`delete_prop_img_${blocIndex}_${propIndex}_${imgIndex}`" :name="`blocs[${blocIndex}][propositions][${propIndex}][existing_images][${imgIndex}][delete]`" value="1">
+                                                    <label :for="`delete_prop_img_${blocIndex}_${propIndex}_${imgIndex}`" style="display: inline;">Supprimer</label>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div>
+                                        <input type="file" :name="`prop_new_images_${blocIndex}_${propIndex}[]`" multiple accept="image/*">
+                                    </div>
+                                </div>
+
                                 <label>Points:</label>
                                 <select :name="`blocs[${blocIndex}][propositions][${propIndex}][solution_points]`" x-model="prop.solution_points" required>
                                     <?php foreach ($solution_points_options as $option): ?>
@@ -196,10 +236,10 @@ $penalty_options = [
                                     <?php endforeach; ?>
                                 </select>
 
-                                <!-- NEW APPROACH: Show precedent as text with modify option -->
+
+                                <!-- Sanction Logic -->
                                 <label>Sanction si choisie avant la proposition :</label>
                                 <div>
-                                    <!-- Static display mode -->
                                     <div x-show="!prop.modify_precedent" class="precedent-info">
                                         <span x-show="prop.precedent_text">
                                             <strong>Actuellement:</strong> <span x-text="prop.precedent_text"></span>
@@ -211,8 +251,6 @@ $penalty_options = [
                                         </span>
                                         <button type="button" @click="prop.modify_precedent = true" class="secondary" style="margin-left: 1em; padding: 0.2em 0.5em;">Modifier</button>
                                     </div>
-                                    
-                                    <!-- Edit mode -->
                                     <div x-show="prop.modify_precedent">
                                         <select :name="`blocs[${blocIndex}][propositions][${propIndex}][precedent_proposition_for_penalty_id]`" x-model="prop.precedent_proposition_for_penalty_id">
                                             <option value="">Aucune</option>
@@ -224,7 +262,6 @@ $penalty_options = [
                                         <button type="button" @click="prop.modify_precedent = false" class="secondary" style="padding: 0.2em 0.5em;">Annuler</button>
                                     </div>
                                 </div>
-
                                 <label>Nature de la sanction:</label>
                                 <select :name="`blocs[${blocIndex}][propositions][${propIndex}][penalty_value_if_chosen_early]`" x-model="prop.penalty_value_if_chosen_early">
                                     <?php foreach ($penalty_options as $opt): ?>
@@ -254,19 +291,16 @@ document.addEventListener('alpine:init', () => {
         },
         
         init() {
-            // Convert null penalty values to empty string for the selects
             this.project.blocs.forEach(bloc => {
                 bloc.propositions.forEach(prop => {
                     if (prop.penalty_value_if_chosen_early === null) {
                         prop.penalty_value_if_chosen_early = '';
                     }
-                    // Add modify_precedent flag if not already present
                     if (typeof prop.modify_precedent === 'undefined') {
                         prop.modify_precedent = false;
                     }
                 });
             });
-            
             console.log("Editor initialized with data:", this.project);
         },
         
@@ -295,8 +329,9 @@ document.addEventListener('alpine:init', () => {
                 solution_points: '0',
                 precedent_proposition_for_penalty_id: '',
                 precedent_text: null,
-                modify_precedent: true, // New propositions start in edit mode
-                penalty_value_if_chosen_early: ''
+                modify_precedent: true, 
+                penalty_value_if_chosen_early: '',
+                images: [] // NEW: Add images array for new propositions
             });
         },
         
