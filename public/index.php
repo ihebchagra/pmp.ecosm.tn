@@ -3,17 +3,30 @@
 <head>
     <title>Créateur PMP</title>
     <?php require_once __DIR__ . '/../powertrain/head.php' ?>
+    <style>
+        img {
+            height: 10rem;
+            margin-bottom: 1rem;
+        }
+        button {
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
     <main class="container home-container">
+        <img src="img/fmt.png">
         <h1>Créateur PMP</h1>
+        <h2>pmp.ecosm.tn</h2>
         <p>
-            Bienvenue sur Créateur PMP, votre outil en ligne pour créer des Patient-management problems (PMP). Utilisez
-            notre plateforme pour générer des scénarios cliniques réalistes.
+            Bienvenue sur Créateur PMP, un outil en ligne pour créer des <b>Patient-management problems (PMP)</b> pour les étudiants en médecine.
         </p>
-        <div class="centered-container">
-            <button onclick="window.location.href='/login.php'">Se connecter avec votre email institutionnel (utm.tn)</button>
-        </div>
+        <section>
+            <button onclick="window.location.href='/login.php'">Se connecter avec votre email institutionnel (@fmt.utm.tn)</button>
+        </section>
+        <section>
+            <button onclick="window.location.href='/about.php'" class="secondary">À Propos</button>
+        </section>
     </main>
 <?php
     /* <footer class="footer"> */

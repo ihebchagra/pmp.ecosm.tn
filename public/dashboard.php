@@ -53,19 +53,30 @@ try {
 <body>
     <main class="container">
         <h1>Bienvenue Dr&nbsp;<?php echo htmlspecialchars(ucwords(strtolower($user['name']))); ?> </h1>
+
         <div class="dashboard-content">
-            <h2>Vos PMPs</h2>
             <?php if (!empty($successMessage)): ?>
                 <p style="color: green;"><?php echo $successMessage; ?></p>
             <?php endif; ?>
             <?php if (!empty($errorMessage)): ?>
                 <p style="color: red;"><?php echo $errorMessage; ?></p>
             <?php endif; ?>
+            <h2>Vos PMPs</h2>
+
+            <form method="post" action="/add-project.php">
+                <label for="project_name"><h3>Ajouter un nouveau PMP :</h3></label>
+                <input type="text" id="project_name" name="project_name" placeholder="Entrez le nom du nouveau PMP" required>
+                <!-- The hidden problem_text input is removed as it's no longer in user_projects -->
+                <button type="submit">Ajouter et Configurer</button>
+            </form>
+
+            <div>
+            <h3>Gérer vos PMP :</h3>
             <?php if (count($projects) > 0): ?>
                 <?php foreach ($projects as $project): ?>
                     <article>
-                        <details>
-                            <summary><?php echo htmlspecialchars($project['project_name']); ?> <small>(Mis à jour: <?php echo date('d/m/Y H:i', strtotime($project['updated_at'])); ?>)</small></summary>
+                        <details open>
+                            <summary><b><?php echo htmlspecialchars($project['project_name']); ?></b> <small>(Mis à jour: <?php echo date('d/m/Y H:i', strtotime($project['updated_at'])); ?>)</small></summary>
                             <div>
                                 <form method="get" action="/edit.php" style="display: inline-block; margin-right: 5px;">
                                     <input type="hidden" name="project_id" value="<?php echo $project['project_id']; ?>">
@@ -96,15 +107,13 @@ try {
                     <p>Aucun projet trouvé. Commencez par en créer un !</p>
                 <?php endif; ?>
             <?php endif; ?>
+            </div>
 
-            <form method="post" action="/add-project.php" style="margin-top: 2em;">
-                <label for="project_name"><h3>Ajouter un nouveau PMP :</h3></label>
-                <input type="text" id="project_name" name="project_name" placeholder="Entrez le nom du nouveau PMP" required>
-                <!-- The hidden problem_text input is removed as it's no longer in user_projects -->
-                <button type="submit">Ajouter et Configurer</button>
-            </form>
-            <h3 style="margin-top: 2em;">Votre Compte :</h3>
-            <button onclick="window.location.href='/logout.php'">Se déconnecter</button>
+            <div>
+                <h2>Votre Compte :</h2>
+                <button onclick="window.location.href='/logout.php'">Se déconnecter</button>
+                <button onclick="window.location.href='/about.php'" class="secondary">À Propos</button>
+            </div>
         </div>
     </main>
 <?php

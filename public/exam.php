@@ -136,7 +136,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
         .bloc-images img { max-width: 36rem; max-height:auto; width: 100%;  display: block; margin: 0 auto; align-self: center; border: 1px solid #ddd; border-radius:4px;}
         .prop-images img { max-width: 36rem; max-height:auto; width: 100%;  display: block; margin: 0 auto; align-self: center; border: 1px solid #ddd; border-radius:4px;}
         [x-cloak] { display: none !important; }
-        .timer { font-weight: bold; color: var(--pico-primary); }
+        .timer { font-weight: bold; font-size: 2rem; color: #dc3545; }
         .modal-is-open dialog[open] { display: flex; }
         dialog[open] { animation: fade-in 0.3s; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -190,7 +190,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
         <p><b>Tout choix mettant en danger le pronostic vital entraînera l'arrêt immédiat de l'épreuve.</b></p>
         <p>Cliquez sur "Commencer l'Épreuve" pour démarrer l'épreuve.</p>
         <div class="centered" style="margin-top:2em; margin-bottom:2em;">
-            <button @click="startExam()" class="contrast">Commencer l'Épreuve</button>
+            <button @click="startExam(); enterFullscreen();" class="contrast">Commencer l'Épreuve</button>
         </div>
     </section>
 
@@ -208,7 +208,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                 <h4 style="margin-top: 1rem">Énoncé :</h4>
                 <div class="problem-text" x-html="currentBloc().problem_text ? currentBloc().problem_text : ''"></div>
                 <p x-show="currentBlocState() && currentBlocState().timeLeft !== null">
-                    <b>Temps Restant pour ce Bloc</b>:
+                    <h4>Temps Restant pour ce Bloc :</h4>
                     <span class="timer" x-text="currentBlocState() ? formatTime(currentBlocState().timeLeft) : 'N/A'"></span>
                 </p>
                 <!--<p x-show="currentBlocState()">
@@ -229,7 +229,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                                  }">
                                 <p><strong x-text="proposition.proposition_text"></strong></p>
                                 <div x-show="isPropositionChosen(proposition.proposition_id)" class="solution-text" x-transition>
-                                    <p x-text="getPointsLabel(proposition.solution_points)"></p>
+                                    <strong x-text="getPointsLabel(proposition.solution_points)"></strong>
                                     <p x-html="proposition.solution_text ? proposition.solution_text : ''"></p>
                                     <div x-show="proposition.images && proposition.images.length > 0" class="prop-images">
                                         <template x-for="image_path in proposition.images" :key="image_path">
@@ -280,6 +280,16 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
 </div>
 
 <script>
+function enterFullscreen(elem = document.documentElement) {
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen();
+  } else if (elem.webkitRequestFullscreen) { // Safari
+    elem.webkitRequestFullscreen();
+  } else if (elem.msRequestFullscreen) { // IE11
+    elem.msRequestFullscreen();
+  }
+}
+
 class Modal {
     constructor() {
         this.isOpenClass = "modal-is-open"; this.openingClass = "modal-is-opening";
