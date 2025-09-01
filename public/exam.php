@@ -105,7 +105,7 @@ $points_labels_array = [
     '2' => 'Choix essentiel: +2 points', '1' => 'Choix utile: +1 point',
     '0' => 'Choix indifférent : +0 points', '-1' => 'Choix non dangereux mais inefficace : -1 point',
     '-2' => 'Choix dangereux ou inutilement coûteux : -2 points',
-    'dead' => "Choix mettant en danger le pronostic vital: votre score est mis à 0 points, bloc/épreuve fini"
+    'dead' => "Choix mettant en danger le pronostic vital: votre score est mis à 0 points, épreuve fini"
 ];
 $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QUOTES, 'UTF-8');
 ?>
@@ -240,7 +240,7 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                                         <p :class="{'penalty-info': true, 'dead': getPenaltyTypeForProposition(proposition.proposition_id) === 'dead'}">
                                             <strong>Sanction appliquée:</strong>
                                             <span x-text="getPenaltyTypeForProposition(proposition.proposition_id) === 'dead' ?
-                                                'Mortelle (score du bloc mis à 0)' :
+                                                'Mortelle (Fin d\'épreuve et score mis à 0)' :
                                                 getAppliedPenaltyForProposition(proposition.proposition_id) + ' points'"></span>
                                             pour choix prématuré.
                                         </p>
@@ -252,11 +252,11 @@ $points_labels_json = htmlspecialchars(json_encode($points_labels_array), ENT_QU
                 </div>
 
                 <div class="navigation-section" x-show="examFlow.examStarted && !examFlow.examFinished && currentBloc()">
-                    <div x-show="currentBlocState() && currentBlocState().isEnded">
+                    <div x-show="currentBlocState() && currentBlocState().isEnded && !deadChoiceMade">
                         <h4>Ce bloc est terminé.</h4>
                     </div>
-                     <button style="width: 100%" @click="moveToNextBlocOrFinish()" class="primary" :disabled="!currentBlocState()">
-                        <span x-text="examFlow.currentBlocIndex < examStructure.length - 1 ? 'Passer au Bloc Suivant' : 'Terminer l\'Examen'"></span>
+                    <button style="width: 100%" @click="handleNextOrFinishClick()" class="primary" :disabled="!currentBlocState()">
+                        <span x-text="getButtonLabel()"></span>
                     </button>
                 </div>
             </div>
@@ -304,7 +304,7 @@ class Modal {
             <dialog id="pico-modal"> <article> <header>
             <button aria-label="Close" rel="prev" class="pico-modal-close"></button>
             <h3 class="pico-modal-title">Confirmation</h3> </header>
-            <p class="pico-modal-message">Êtes-vous sûr?</p> <footer>
+            <p class="pico-modal-message">tes-vous sùr?</p> <footer>
             <button class="pico-modal-confirm">Confirmer</button>
             <button class="secondary pico-modal-cancel" autofocus>Annuler</button>
             </footer> </article> </dialog> `;
@@ -323,7 +323,7 @@ class Modal {
             if (event.key === 'Escape' && this.modalElement && this.modalElement.open) this.closeModal(false);
         });
     }
-    async confirm(message = 'Êtes-vous sûr?', title = 'Confirmation') {
+    async confirm(message = 'tes-vous sùr?', title = 'Confirmation') {
         if (!this.modalElement) this._init();
         this.modalElement.querySelector('.pico-modal-title').textContent = title;
         this.modalElement.querySelector('.pico-modal-message').textContent = message;
@@ -359,6 +359,7 @@ function examController(examData, attemptId, pointsLabels) {
         pointsLabels: pointsLabels,
         activeTimers: {},
         isSaving: false,
+        deadChoiceMade: Alpine.$persist(false).as(`deadChoiceMade-${attemptId}`),
 
         examFlow: {
             _examStarted: Alpine.$persist(false).as(`examStarted-${attemptId}`),
@@ -417,13 +418,14 @@ function examController(examData, attemptId, pointsLabels) {
                 this.examFlow.currentBlocIndex = 0;
                 this.examFlow.examFinished = false;
                 this.examFlow.overallScore = 0;
+                this.deadChoiceMade = false;
                 Object.keys(this.blocsState).forEach(key => delete this.blocsState[key]);
                 this.activeTimers = {};
                 this.$nextTick(() => {
                     const initState = this.currentBlocState();
                     if (initState) this.startBlocTimer();
                 });
-                console.log("Épreuve commencée, bloc:", this.examFlow.currentBlocIndex + 1);
+                console.log("preuve commencée, bloc:", this.examFlow.currentBlocIndex + 1);
             }
         },
         startBlocTimer() {
@@ -473,7 +475,7 @@ function examController(examData, attemptId, pointsLabels) {
 
         async selectProposition(proposition) {
             const state = this.currentBlocState();
-            if (!state || state.isEnded || this.isPropositionChosen(proposition.proposition_id)) return;
+            if (!state || state.isEnded || this.isPropositionChosen(proposition.proposition_id) || this.deadChoiceMade) return;
 
             const confirmed = await modal.confirm(`Confirmez-vous le choix : "${proposition.proposition_text}" ?`, 'Confirmation');
             if (confirmed) {
@@ -486,12 +488,8 @@ function examController(examData, attemptId, pointsLabels) {
                     if (!state.chosenPropositionIds.includes(requiredPrecedentId)) {
                         // Precedent NOT chosen yet, apply penalty
                         if (proposition.penalty_value_if_chosen_early === 'dead') {
-                            // Handle 'dead' penalty - set score to 0 and end the bloc
-                            state.score = 0;
-                            state.appliedPenalties[proposition.proposition_id] = 'dead';
-                            state.isEnded = true;
-                            this.stopBlocTimer();
-                            console.log(`DEAD PENALTY APPLIED for prop ${proposition.proposition_id}. Score reset to 0. Bloc ended.`);
+                            this.handleDeadChoice(proposition);
+                            return; // Stop further processing
                         } else {
                             // Handle numeric penalty (-1, -2)
                             const penaltyValue = parseInt(proposition.penalty_value_if_chosen_early) || 0;
@@ -506,10 +504,8 @@ function examController(examData, attemptId, pointsLabels) {
                 state.chosenPropositionIds.push(proposition.proposition_id);
 
                 if (proposition.solution_points === 'dead') {
-                    state.score = 0; // DEAD sets score to 0, overriding previous points/penalties for the bloc
-                    this.stopBlocTimer();
-                    state.isEnded = true;
-                    console.log(`DEAD solution_points for prop ${proposition.proposition_id} chosen. Bloc score is 0. Bloc ended.`);
+                    this.handleDeadChoice(proposition);
+                    return; // Stop further processing
                 } else {
                     const regularPoints = parseInt(proposition.solution_points) || 0;
                     state.score += regularPoints;
@@ -518,6 +514,58 @@ function examController(examData, attemptId, pointsLabels) {
             } else {
                 console.log("Proposition selection cancelled.");
             }
+        },
+
+        handleDeadChoice(proposition) {
+            const state = this.currentBlocState();
+            if (!state) return;
+
+            console.log(`DEAD choice made. Proposition ID: ${proposition.proposition_id}.`);
+            this.deadChoiceMade = true;
+            state.isEnded = true; // Block further selections in this bloc
+            this.stopBlocTimer();
+
+            // Apply penalty if it's a premature choice
+            if (proposition.penalty_value_if_chosen_early === 'dead') {
+                state.appliedPenalties[proposition.proposition_id] = 'dead';
+            }
+            
+            // Ensure the dead proposition is marked as chosen to show feedback
+            if (!state.chosenPropositionIds.includes(proposition.proposition_id)) {
+                state.chosenPropositionIds.push(proposition.proposition_id);
+            }
+        },
+
+        forceFinishExam() {
+            console.log("Forcing exam finish due to dead choice.");
+
+            // Mark all blocs as ended and score as 0
+            for (const blocId in this.blocsState) {
+                if (this.blocsState.hasOwnProperty(blocId)) {
+                    this.blocsState[blocId].score = 0;
+                    this.blocsState[blocId].isEnded = true;
+                }
+            }
+            
+            // Also ensure any future blocs that haven't been started yet are also zeroed out
+            this.examStructure.forEach(bloc => {
+                if (!this.blocsState[bloc.bloc_id]) {
+                    this.blocsState[bloc.bloc_id] = {
+                        score: 0,
+                        timeLeft: null,
+                        isEnded: true,
+                        chosenPropositionIds: [],
+                        appliedPenalties: {}
+                    };
+                } else {
+                    this.blocsState[bloc.bloc_id].score = 0;
+                    this.blocsState[bloc.bloc_id].isEnded = true;
+                }
+            });
+
+            // Finish the exam and submit
+            this.finishExam();
+            this.submitAttemptResults();
         },
 
         getAppliedPenaltyForProposition(propositionId) {
@@ -543,7 +591,7 @@ function examController(examData, attemptId, pointsLabels) {
         },
         isPropositionDisabled(propositionId) {
             const state = this.currentBlocState();
-            return (state && state.isEnded) || this.isPropositionChosen(propositionId);
+            return (state && state.isEnded) || this.isPropositionChosen(propositionId) || this.deadChoiceMade;
         },
         getPointsLabel(pointsValue) { return this.pointsLabels[pointsValue] || 'Points non définis'; },
         formatTime(totalSeconds) {
@@ -552,6 +600,22 @@ function examController(examData, attemptId, pointsLabels) {
             const seconds = totalSeconds % 60;
             return `${minutes}:${seconds.toString().padStart(2, '0')}`;
         },
+        
+        getButtonLabel() {
+            if (this.deadChoiceMade) {
+                return "Terminer l'épreuve";
+            }
+            return this.examFlow.currentBlocIndex < this.examStructure.length - 1 ? 'Passer au Bloc Suivant' : 'Terminer l\'Examen';
+        },
+
+        handleNextOrFinishClick() {
+            if (this.deadChoiceMade) {
+                this.forceFinishExam();
+            } else {
+                this.moveToNextBlocOrFinish();
+            }
+        },
+
         async moveToNextBlocOrFinish() {
             const cbState = this.currentBlocState();
             if (!cbState) { console.error("Cannot move: no current bloc state."); return; }
@@ -642,6 +706,7 @@ function examController(examData, attemptId, pointsLabels) {
             localStorage.removeItem(`overallScore-${this.attemptId}`);
             localStorage.removeItem(`examFinished-${this.attemptId}`);
             localStorage.removeItem(`blocsState-${this.attemptId}`);
+            localStorage.removeItem(`deadChoiceMade-${this.attemptId}`);
             this.activeTimers = {};
         }
     }

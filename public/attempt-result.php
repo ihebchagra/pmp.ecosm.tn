@@ -144,6 +144,7 @@ foreach ($answers_data as $answer_item) {
 
 $bloc_min_max_scores = []; // Stores min, max, range for each bloc_id
 $bloc_normalized_scores_map = []; // Stores final normalized score /20 for each bloc_id
+$is_attempt_dead = false; // Flag for the whole attempt
 
 foreach ($blocs_for_project as $bloc_item) {
     $bloc_id_current = $bloc_item['bloc_id'];
@@ -162,23 +163,23 @@ foreach ($blocs_for_project as $bloc_item) {
     $bloc_min_max_scores[$bloc_id_current] = ['min' => $min_s, 'max' => $max_s, 'range' => $current_range];
     
     $raw_s = $bloc_raw_scores_map[$bloc_id_current] ?? 0;
-    if (!isset($answers_by_bloc_id[$bloc_id_current])) {
-         $norm_s = 0;
-    }else if ($bloc_is_dead[$bloc_id_current] == true) {
+    if (isset($bloc_is_dead[$bloc_id_current]) && $bloc_is_dead[$bloc_id_current]) {
+        $norm_s = 0;
+        $is_attempt_dead = true;
+    } else if (!isset($answers_by_bloc_id[$bloc_id_current])) {
          $norm_s = 0;
     } else if ($current_range > 0) {
         $norm_s = round((($raw_s + abs($min_s)) / $current_range) * 20, 2);
     } else { 
-        // If range is 0 (e.g., all propositions have 0 points, no negatives)
-        // If raw score is also 0, it means student got all 0-point items right (or didn't pick any) -> perfect score for this type of bloc.
-        // If raw score is not 0 (shouldn't happen if range is 0 and no dead), then 0.
         $norm_s = ($raw_s == 0) ? 20 : 0; 
     }
     $bloc_normalized_scores_map[$bloc_id_current] = $norm_s;
 }
 
 $total_normalized_score_final_recalc = 0; // Recalculated total score based on normalized bloc scores
-if (count($bloc_normalized_scores_map) > 0) {
+if ($is_attempt_dead) {
+    $total_normalized_score_final_recalc = 0;
+} else if (count($bloc_normalized_scores_map) > 0) {
     $total_normalized_score_final_recalc = round(array_sum($bloc_normalized_scores_map) / count($bloc_normalized_scores_map), 2);
 }
 // The $attempt['result'] should ideally match this $total_normalized_score_final_recalc.
@@ -330,7 +331,7 @@ $project_name_html = htmlspecialchars($project['project_name']);
                     <?php if ($answer_display_item['penalty_applied']): ?>
                     <p class="penalty-info <?php echo $answer_display_item['penalty_applied'] === 'dead' ? 'dead' : ''; ?>">
                         <strong>Sanction appliquée:</strong>
-                        <?php echo $answer_display_item['penalty_applied'] === 'dead' ? 'Mortelle (score du bloc mis à 0)' : ($answer_display_item['penalty_applied'] . ' points'); ?>
+                        <?php echo $answer_display_item['penalty_applied'] === 'dead' ? 'Mortelle (Fin d\'épreuve et score mis à 0)' : ($answer_display_item['penalty_applied'] . ' points'); ?>
                         pour choix prématuré.
                     </p>
                     <?php endif; ?>

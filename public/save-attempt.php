@@ -133,23 +133,27 @@ try {
 
     // Calculate the normalized score for each bloc
     $bloc_normalized_scores = [];
+    $is_attempt_dead = false; // Flag for the whole attempt
+
     foreach (array_keys($blocs) as $bloc_id) {
         $raw_score = 0;
-        $is_dead = false;
+        $is_bloc_dead = false;
 
         if (isset($answers_by_bloc[$bloc_id])) {
             foreach ($answers_by_bloc[$bloc_id] as $answer) {
                 if ($answer['solution_points'] === 'dead' || $answer['penalty_applied'] === 'dead') {
-                    $is_dead = true;
+                    $is_bloc_dead = true;
+                    $is_attempt_dead = true; // Set the attempt-level flag
                     break;
                 }
                 $raw_score += (int)($answer['solution_points'] ?? 0) + (int)($answer['penalty_applied'] ?? 0);
             }
         } else {
-            $is_dead = true; // A bloc with no answers is considered "dead" with a score of 0
+            // A bloc with no answers is considered "dead" with a score of 0, but doesn't make the whole attempt dead
+            $is_bloc_dead = true;
         }
 
-        if ($is_dead) {
+        if ($is_bloc_dead) {
             $bloc_normalized_scores[$bloc_id] = 0;
             continue;
         }
@@ -174,9 +178,11 @@ try {
         }
     }
 
-    // Calculate final score as the average of bloc scores
+    // Calculate final score
     $total_normalized_score = 0;
-    if (!empty($bloc_normalized_scores)) {
+    if ($is_attempt_dead) {
+        $total_normalized_score = 0;
+    } elseif (!empty($bloc_normalized_scores)) {
         $total_normalized_score = round(array_sum($bloc_normalized_scores) / count($bloc_normalized_scores), 2);
     }
 

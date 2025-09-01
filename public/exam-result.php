@@ -202,7 +202,7 @@ foreach ($blocs as $bloc) {
                                     <p class="penalty-info <?php echo $answer['penalty_applied'] === 'dead' ? 'dead' : ''; ?>">
                                         <strong>Pénalité appliquée:</strong> 
                                         <?php if ($answer['penalty_applied'] === 'dead'): ?>
-                                            Mortelle (score du bloc mis à 0)
+                                            Mortelle (Fin d'épreuve et score mis à 0)
                                         <?php else: ?>
                                             <?php echo $answer['penalty_applied']; ?> points
                                         <?php endif; ?>

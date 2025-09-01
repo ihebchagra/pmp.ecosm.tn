@@ -2,3 +2,4 @@ public/uploads/*
 vendor/*
 powertrain/config.php
 uploads
+pmp_backup.sql

@@ -230,3 +230,7 @@ details[open]>*:not(summary) {
 nav > ul > li > a {
     text-decoration: underline!important;
 }
+
+@view-transition {
+  navigation: auto;
+}
