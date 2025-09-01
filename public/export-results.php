@@ -51,7 +51,7 @@ if ($export_type === 'summary') {
     fputcsv($output, [
         'ID Tentative', 'Nom Etudiant', 'Score /20', 'Date Tentative', 
         'Stage', 'Niveau', 'Centre Examen'
-    ]);
+    ], ';');
 
     $stmt = $db->prepare("SELECT * FROM attempts WHERE project_id = :pid AND locked = TRUE ORDER BY created_at DESC");
     $stmt->execute(['pid' => $project_id]);
@@ -65,7 +65,7 @@ if ($export_type === 'summary') {
             $row['stage'],
             $row['niveau'],
             $row['centre_exam']
-        ]);
+        ], ';');
     }
 
 } elseif ($export_type === 'detailed') {
@@ -75,7 +75,7 @@ if ($export_type === 'summary') {
         'ID Bloc', 'Texte Enonce',
         'ID Proposition', 'Texte Proposition', 'Points Proposition',
         'Penalite Appliquee', 'Date du Choix'
-    ]);
+    ], ';');
 
     // This is a large query to get all data in one go
     $stmt = $db->prepare("
@@ -100,6 +100,7 @@ if ($export_type === 'summary') {
     ");
     $stmt->execute(['pid' => $project_id]);
 
+
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         fputcsv($output, [
             $row['attempt_id'],
@@ -113,7 +114,7 @@ if ($export_type === 'summary') {
             $row['solution_points'],
             $row['penalty_applied'],
             $row['chosen_at']
-        ]);
+        ], ';');
     }
 } else {
     // Handle invalid type
